@@ -72,8 +72,7 @@ void loop()
   // Verificação da sequencia do usuário
   if(perdeuJogo == true){
 
-    limparJogo()
-    
+    limparJogo();
   } else{
 
     proximaRodada();
@@ -88,11 +87,8 @@ void loop()
 // Métodos utilizados
 
 void proximaRodada(){
-  
-  int sorteioLeds = random(4);
-  sequencia[rodada] = sorteioLeds;
+  sequencia[rodada] = random(4);
   rodada += 1;
-  
 }
 
 void reproduzirSequencia(){
