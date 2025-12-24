@@ -139,7 +139,7 @@ void limparJogo(){
 
 bool jogadaUsuario() {
 
-  for(int i = 0; i <= 3; i++){
+  for(int i = 0; i < 3; i++){
     if(digitalRead(botoes[i]) == 1){
       botaoPressionado = i;
       
