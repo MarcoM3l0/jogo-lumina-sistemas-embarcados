@@ -27,7 +27,7 @@ int btnVerde = 11;
     - leds
     - tons (RÉ, FÁ, MI, DÓ)
 */
-int sequencia[16] = {};
+int sequencia[12] = {};
 int botoes[4] = {btnVermelho, btnAmarelo, btnAzul, btnVerde};
 int leds[4] = {ledVermelho, ledAmarelo, ledAzul, ledVerde};
 int tons[4] = {294, 349, 330, 262};
@@ -69,19 +69,19 @@ void setup()
 void loop()
 {
   
-  proximaRodada();
-  reproduzirSequencia();
-  esperarJogador();
-  
   // Verificação da sequencia do usuário
   if(perdeuJogo == true){
-    sequencia[16] = {};
-    rodada = 0;
-    passo = 0;
-    perdeuJogo = false;
+
+    limparJogo()
+    
+  } else{
+
+    proximaRodada();
+    reproduzirSequencia();
+    esperarJogador();
+    
+    delay(1000);
   }
-  
-  delay(1000);
 }
 
 
@@ -157,7 +157,16 @@ void esperarJogador(){
   passo = 0;
 }
 
+void limparJogo(){
 
+  for(int i = 0; i < 12; i++){
+    sequencia[i] = 0;
+  }
+
+    rodada = 0;
+    passo = 0;
+    perdeuJogo = false;
+}
 
 
 
