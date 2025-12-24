@@ -57,6 +57,19 @@ int botaoPressionado = 0;
 // Flag que indica se o jogador errou a sequência
 bool perdeuJogo = false;
 
+// ========== VARIÁVEIS DE VELOCIDADE/DIFICULDADE ==========
+/*
+  Sistema de dificuldade progressiva:
+  - velocidade1: delay entre rodadas (quanto tempo espera antes da próxima rodada)
+  - velocidade2: tempo que o LED fica aceso ao reproduzir a sequência
+  - velocidade3: intervalo entre LEDs na sequência
+  
+  Quanto menores os valores, mais rápido e difícil fica o jogo
+*/
+int velocidade1 = 1000;
+int velocidade2 = 300;
+int velocidade3 = 200;
+
 void setup()
 {
   // Configura todos os LEDs como saída 
@@ -96,7 +109,16 @@ void loop()
     reproduzirSequencia();  // 2. Mostra a sequência completa ao jogador
     esperarJogador();       // 3. Aguarda o jogador repetir a sequência
     
-    delay(1000);
+    delay(velocidade1);
+
+    // ========== AUMENTO DE DIFICULDADE ==========
+    // Quando chegar na rodada 7, aumenta a dificuldade
+    // diminuindo os tempos de espera (jogo fica mais rápido)
+    if(rodada == 7){
+      velocidade1 = 500;
+      velocidade2 = 150;
+      velocidade3 = 100;
+    }
   }
 }
 
@@ -126,11 +148,11 @@ void reproduzirSequencia(){
     tone(7, tons[sequencia[i]], 250);
     digitalWrite(leds[sequencia[i]], 1);
     
-    delay(500);
+    delay(velocidade2);
     
     noTone(7);
     digitalWrite(leds[sequencia[i]], 0);
-    delay(100);
+    delay(velocidade3);
   }
   
 }
@@ -179,6 +201,10 @@ void limparJogo(){
     rodada = 0;
     passo = 0;
     perdeuJogo = false;
+
+    velocidade1 = 1000;
+    velocidade2 = 300;
+    velocidade3 = 200;
 }
 
 /*
