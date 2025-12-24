@@ -113,38 +113,11 @@ void esperarJogador(){
     bool jogou = false;
     
     while (!jogou) {
-      
-      for(int j = 0; j <= 3; j++){
-        if(digitalRead(botoes[j]) == 1){
-          botaoPressionado = j;
-          
-          tone(7, tons[sequencia[j]], 250);
-          digitalWrite(leds[sequencia[j]], 1);
-          	
-          delay(300);
-          
-          digitalWrite(leds[sequencia[i]], 0);
-          noTone(7);
-          jogou = true;
-        }
-      }
-      
+      jogou = jogadaUsuario();
     }
     
     // Verificar a jogada
-    if(sequencia[passo] != botaoPressionado){
-      for(int x = 0; x <= 3; x++){
-        tone(7, 70, 250);
-        digitalWrite(leds[sequencia[i]], 1);
-        
-        delay(100);
-        
-        noTone(7);
-        digitalWrite(leds[sequencia[i]], 0);
-      }
-      perdeuJogo = true;
-      break;
-    }
+    if(verificarJogada(i)) break;
     
     passo += 1;
     
@@ -164,8 +137,58 @@ void limparJogo(){
     perdeuJogo = false;
 }
 
+bool jogadaUsuario() {
+
+  for(int i = 0; i <= 3; i++){
+    if(digitalRead(botoes[i]) == 1){
+      botaoPressionado = i;
+      
+      tone(7, tons[i], 250);
+      digitalWrite(leds[i], 1);
+        
+      delay(300);
+      
+      digitalWrite(leds[botaoPressionado], 0);
+      noTone(7);
+
+      while(digitalRead(botoes[i]) == 1){
+        delay(10);
+      }
+
+      return true;
+    }
+  }
+
+  return false;
+}
 
 
+bool verificarJogada(int index) {
+
+  if(sequencia[index] != botaoPressionado){
+    for(int i = 0; i <= 3; i++){
+      tone(7, 70, 250);
+
+      for(int x = 0; x < 4; x++){
+        digitalWrite(leds[x], 1);
+      }
+      
+      delay(200);
+      
+      noTone(7);
+      for(int x = 0; x < 4; x++){
+        digitalWrite(leds[x], 0);
+      }
+
+      delay(200);
+    }
+
+    perdeuJogo = true;
+    return true;
+  }
+
+  return false;
+}
 
 
 
