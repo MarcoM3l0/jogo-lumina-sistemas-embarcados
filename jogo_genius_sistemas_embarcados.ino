@@ -87,10 +87,6 @@ void setup()
   pinMode(btnAzul, INPUT);
   pinMode(btnVerde, INPUT);
   
-  // Inicia comunicação serial para debug
-  Serial.begin(9600);
-  
-  
   // Inicializa o gerador de números aleatórios usando ruído da porta analógica
   // Isso garante que cada jogo terá uma sequência diferente
   randomSeed(analogRead(A0));
@@ -111,7 +107,6 @@ void loop()
     
     delay(velocidade1);
 
-    // ========== AUMENTO DE DIFICULDADE ==========
     // Quando chegar na rodada 7, aumenta a dificuldade
     // diminuindo os tempos de espera (jogo fica mais rápido)
     if(rodada == 7){
@@ -301,76 +296,39 @@ bool verificarJogada(int index) {
 void venceuJogo() {
 
   // ========== ARRAYS DA MELODIA DE VITÓRIA ==========
-  // Array com as frequências de cada nota da música
-  // Representa o tema clássico do Super Mario Bros
-  int melodia[] = { 660, 660, 660, 510, 660, 770, 380, 510, 380, 320, 440, 480, 450, 430, 
-                    380, 660, 760, 860, 700, 760, 660, 520, 580, 480, 510, 380, 320, 440, 
-                    480, 450, 430, 380, 660, 760, 860, 700, 760, 660, 520, 580, 480, 500, 
-                    760, 720, 680, 620, 650, 380, 430, 500, 430, 500, 570, 500, 760, 720, 
-                    680, 620, 650, 1020, 1020, 1020, 380, 500, 760, 720, 680, 620, 650, 
-                    380, 430, 500, 430, 500, 570, 585, 550, 500, 380, 500, 500, 500, 500, 
-                    760, 720, 680, 620, 650, 380, 430, 500, 430, 500, 570, 500, 760, 720, 
-                    680, 620, 650, 1020, 1020, 1020, 380, 500, 760, 720, 680, 620, 650, 
-                    380, 430, 500, 430, 500, 570, 585, 550, 500, 380, 500, 500, 500, 500, 
-                    500, 500, 500, 580, 660, 500, 430, 380, 500, 500, 500, 500, 580, 660, 
-                    870, 760, 500, 500, 500, 500, 580, 660, 500, 430, 380, 660, 660, 660, 
-                    510, 660, 770, 380 };
+  // Array com as frequências das 14 primeiras notas do tema do Super Mario Bros
+  // Versão reduzida para economizar memória RAM do Arduino
+  int melodia[] = {660, 660, 660, 510, 660, 770, 380, 510, 380, 320, 440, 480, 450, 430};
 
   // Array com a duração de cada nota
   // Controla por quanto tempo cada nota será tocada
-  int melodiaDuracao[] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 80, 100, 
-                           100, 100, 80, 50, 100, 80, 50, 80, 80, 80, 80, 100, 100, 100, 
-                           100, 80, 100, 100, 100, 80, 50, 100, 80, 50, 80, 80, 80, 80, 
-                           100, 100, 100, 100, 150, 150, 100, 100, 100, 100, 100, 100, 
-                           100, 100, 100, 100, 150, 200, 80, 80, 80, 100, 100, 100, 100,
-                           100, 150, 150, 100, 100, 100, 100, 100, 100, 100, 100, 100, 
-                           100, 100, 100, 100, 100, 100, 100, 100, 150, 150, 100, 100, 
-                           100, 100, 100, 100, 100, 100, 100, 100, 150, 200, 80, 80, 80, 
-                           100, 100, 100, 100, 100, 150, 150, 100, 100, 100, 100, 100, 
-                           100, 100, 100, 100, 100, 100, 100, 100, 60, 80, 60, 80, 80, 80, 
-                           80, 80, 80, 60, 80, 60, 80, 80, 80, 80, 80, 60, 80, 60, 80, 80, 
-                           80, 80, 80, 80, 100, 100, 100, 100, 100, 100, 100 };
+  int melodiaDuracao[] = {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 80, 100, 100};
 
   // Array com a pausa após cada nota
   // Controla o intervalo entre as notas para criar o ritmo
-  int melodiaPausa[] = { 150, 300, 300, 100, 300, 550, 575, 450, 400, 500, 300, 330, 150, 
-                         300, 200, 200, 150, 300, 150, 350, 300, 150, 150, 500, 450, 400, 
-                         500, 300, 330, 150, 300, 200, 200, 150, 300, 150, 350, 300, 150, 
-                         150, 500, 300, 100, 150, 150, 300, 300, 150, 150, 300, 150, 100, 
-                         220, 300, 100, 150, 150, 300, 300, 300, 150, 300, 300, 300, 100, 
-                         150, 150, 300, 300, 150, 150, 300, 150, 100, 420, 450, 420, 360, 
-                         300, 300, 150, 300, 300, 100, 150, 150, 300, 300, 150, 150, 300, 
-                         150, 100, 220, 300, 100, 150, 150, 300, 300, 300, 150, 300, 300, 
-                         300, 100, 150, 150, 300, 300, 150, 150, 300, 150, 100, 420, 450, 
-                         420, 360, 300, 300, 150, 300, 150, 300, 350, 150, 350, 150, 300, 
-                         150, 600, 150, 300, 350, 150, 150, 550, 325, 600, 150, 300, 350, 
-                         150, 350, 150, 300, 150, 600, 150, 300, 300, 100, 300, 550, 575 };
+  int melodiaPausa[] = {150, 300, 300, 100, 300, 550, 575, 450, 400, 500, 300, 330, 150, 300};
  
   // Reprodução da melodia e o show de luzes
-  for(int i = 0; i < 156; i++){
+  for(int i = 0; i < 14; i++){
     tone(7, melodia[i], melodiaDuracao[i]);
 
-    digitalWrite(2, 1);
-    digitalWrite(3, 1);
-    digitalWrite(4, 1);
-    digitalWrite(5, 1);
+    digitalWrite(ledVermelho, 1);
+    digitalWrite(ledAmarelo, 1);
+    digitalWrite(ledAzul, 1);
+    digitalWrite(ledVerde, 1);
 
     delay(15);
 
-    digitalWrite(2, 0);
-    digitalWrite(3, 0);
-    digitalWrite(4, 0);
-    digitalWrite(5, 0);
+    digitalWrite(ledVermelho, 0);
+    digitalWrite(ledAmarelo, 0);
+    digitalWrite(ledAzul, 0);
+    digitalWrite(ledVerde, 0);
 
     delay(melodiaPausa[i]);
 
     noTone(7);
   }
+
+  // Após a melodia, o jogo será resetado pelo loop principal
+  delay(2000);
 }
-
-
-
-
-
-
-
