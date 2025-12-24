@@ -1,96 +1,124 @@
-// Variáveis Globais
-
-// Definindo os leds
+// ========== CONFIGURAÇÃO DE HARDWARE ==========
+// Pinos dos LEDs
 int ledVermelho = 2;
 int ledAmarelo = 3;
 int ledAzul = 4;
 int ledVerde = 5;
 
-// Definindo o Buzzer
+// Pino do Buzzer
 int buzzer = 7;
 
-// Definindo os botões
+// Pinos dos Botões
 int btnVermelho = 8;
 int btnAmarelo = 9;
 int btnAzul = 10;
 int btnVerde = 11;
 
+// ========== ESTRUTURAS DE DADOS ==========
 /*
-	Definindo os arrays
-    - Sequencia
-    	- Os números dentro dos índices representam: 
-          - 0 -> Vermelho
-          - 1 -> Amarelo
-          - 2 -> Azul
-          - 3 -> Verde
-    - Botões
-    - leds
-    - tons (RÉ, FÁ, MI, DÓ)
+  Array que armazena a sequência do jogo (máximo 12 rodadas)
+  Cada posição guarda um número de 0 a 3 que representa:
+    0 -> LED Vermelho
+    1 -> LED Amarelo
+    2 -> LED Azul
+    3 -> LED Verde
+  Exemplo: {0, 2, 1, 2, ...} = Vermelho -> Azul -> Amarelo -> Azul -> ...
 */
 int sequencia[12] = {};
+
+// Array com os pinos dos botões na mesma ordem dos LEDs
+// Facilita o acesso aos botões através de índices
 int botoes[4] = {btnVermelho, btnAmarelo, btnAzul, btnVerde};
+
+// Array com os pinos dos LEDs na mesma ordem
+// Permite acender qualquer LED usando: leds[numero]
 int leds[4] = {ledVermelho, ledAmarelo, ledAzul, ledVerde};
+
+// Array com as frequências de som para cada LED
+// Cada LED toca uma nota musical diferente: RÉ, FÁ, MI, DÓ
 int tons[4] = {294, 349, 330, 262};
 
-// Variável de indicação da rodada
+// ========== VARIÁVEIS DE CONTROLE DO JOGO ==========
+/*
+  Contador de rodadas:
+  - indica quantos passos já foram adicionados à sequência
+*/
 int rodada = 0;
 
-// Variávei utilizadas para comparação 
-// da sequencia sorteada com a sequencia do usuário
+/*
+  Contador de passos:
+  - usado para verificar em qual posição da sequência o jogador está
+*/
 int passo = 0;
+
+// Armazena qual botão foi pressionado pelo jogador
 int botaoPressionado = 0;
+
+// Flag que indica se o jogador errou a sequência
 bool perdeuJogo = false;
 
 void setup()
 {
-  // Leds
+  // Configura todos os LEDs como saída 
   pinMode(ledVermelho, OUTPUT);
   pinMode(ledAmarelo, OUTPUT);
   pinMode(ledAzul, OUTPUT);
   pinMode(ledVerde, OUTPUT);
   
-  //Buzzer
+  // Configura o Buzzer como saída
   pinMode(buzzer, OUTPUT);
   
-  //Botões
+  // Configura todos os botões como entrada
   pinMode(btnVermelho, INPUT);
   pinMode(btnAmarelo, INPUT);
   pinMode(btnAzul, INPUT);
   pinMode(btnVerde, INPUT);
   
-  // Monitor Serial: Debug
+  // Inicia comunicação serial para debug
   Serial.begin(9600);
   
   
-  // referência a inicialização da função random()
+  // Inicializa o gerador de números aleatórios usando ruído da porta analógica
+  // Isso garante que cada jogo terá uma sequência diferente
   randomSeed(analogRead(A0));
 }
 
 void loop()
 {
   
-  // Verificação da sequencia do usuário
+  // Verifica se o jogador perdeu o jogo
   if(perdeuJogo == true){
-
+    // Se perdeu, reseta tudo e começa um novo jogo
     limparJogo();
   } else{
-
-    proximaRodada();
-    reproduzirSequencia();
-    esperarJogador();
+    // Fluxo normal do jogo:
+    proximaRodada();        // 1. Adiciona um novo passo à sequência
+    reproduzirSequencia();  // 2. Mostra a sequência completa ao jogador
+    esperarJogador();       // 3. Aguarda o jogador repetir a sequência
     
     delay(1000);
   }
 }
 
 
-// Métodos utilizados
-
+// ========== FUNÇÕES DO JOGO ==========
+/*
+  Adiciona um novo passo aleatório à sequência
+  - Sorteia um número de 0 a 3 (representando as 4 cores)
+  - Adiciona na posição atual da rodada
+  - Incrementa o contador de rodadas
+*/
 void proximaRodada(){
   sequencia[rodada] = random(4);
   rodada += 1;
 }
 
+/*
+  Reproduz a sequência completa para o jogador
+  - Percorre todos os passos da sequência atual
+  - Para cada passo: acende o LED correspondente e toca seu som
+  - Adiciona delays para tornar visível cada passo
+*/
 void reproduzirSequencia(){
   
   for(int i = 0; i < rodada; i++){
@@ -107,25 +135,41 @@ void reproduzirSequencia(){
   
 }
 
+/*
+  Aguarda o jogador repetir toda a sequência
+  - Para cada passo da sequência, espera o jogador apertar um botão
+  - Verifica se o botão pressionado está correto
+  - Se errar, ativa a flag perdeuJogo e encerra
+*/
 void esperarJogador(){
   
   for (int i = 0; i < rodada; i++){
     bool jogou = false;
     
+    // Fica em loop até o jogador apertar algum botão
     while (!jogou) {
-      jogou = jogadaUsuario();
+      jogou = jogadaUsuario(); // Verifica se algum botão foi pressionado
     }
     
-    // Verificar a jogada
+    // Após o jogador apertar, verifica se acertou
+    // Se errou, a função retorna true e o break encerra o loop
     if(verificarJogada(i)) break;
     
+    // Se acertou, avança para o próximo passo
     passo += 1;
-    
   }
   
+  // Reseta o contador de passos para a próxima rodada
   passo = 0;
 }
 
+/*
+  Reseta todas as variáveis e limpa a sequência para começar um novo jogo
+  - Zera todo o array de sequência
+  - Reseta contadores de rodada e passo
+  - Desativa a flag de derrota
+  - Adiciona pausa antes de recomeçar
+*/
 void limparJogo(){
 
   for(int i = 0; i < 12; i++){
@@ -137,11 +181,20 @@ void limparJogo(){
     perdeuJogo = false;
 }
 
+/*
+  Verifica se algum botão foi pressionado e processa a jogada
+  - Varre todos os 4 botões verificando se algum está pressionado
+  - Quando detecta um pressionamento:
+    * Armazena qual botão foi pressionado
+    * Acende o LED e toca o som correspondente
+    * Aguarda o botão ser solto (debounce) para evitar leituras múltiplas
+  - Retorna true se um botão foi pressionado, false caso contrário
+*/
 bool jogadaUsuario() {
 
-  for(int i = 0; i < 3; i++){
+  for(int i = 0; i <= 3; i++){
     if(digitalRead(botoes[i]) == 1){
-      botaoPressionado = i;
+      botaoPressionado = i; // Armazena qual botão foi pressionado
       
       tone(7, tons[i], 250);
       digitalWrite(leds[i], 1);
@@ -151,22 +204,33 @@ bool jogadaUsuario() {
       digitalWrite(leds[botaoPressionado], 0);
       noTone(7);
 
+      // Debounce: aguarda o jogador soltar o botão
+      // Evita que um único pressionamento seja contado múltiplas vezes
       while(digitalRead(botoes[i]) == 1){
         delay(10);
       }
 
+      // Retorna true indicando que uma jogada foi feita
       return true;
     }
   }
 
+  // Se nenhum botão foi pressionado, retorna false
   return false;
 }
 
-
+/*
+  Verifica se a jogada do usuário está correta
+  - Compara o botão pressionado com o passo correto da sequência
+  - Se errou: toca som de erro, pisca todos os LEDs e marca perdeuJogo
+  - Retorna true se errou (para encerrar o loop), false se acertou
+*/
 bool verificarJogada(int index) {
 
   if(sequencia[index] != botaoPressionado){
-    for(int i = 0; i <= 3; i++){
+
+    // Animação de derrota: pisca todos os LEDs 3 vezes com som grave
+    for(int i = 0; i < 3; i++){
       tone(7, 70, 250);
 
       for(int x = 0; x < 4; x++){
@@ -183,10 +247,11 @@ bool verificarJogada(int index) {
       delay(200);
     }
 
-    perdeuJogo = true;
-    return true;
+    perdeuJogo = true;   // Marca que o jogo foi perdido
+    return true;        // Retorna true para encerrar o loop de esperarJogador
   }
 
+  // Se acertou, retorna false para continuar jogando
   return false;
 }
 
