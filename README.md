@@ -44,6 +44,29 @@ O jogo Genius funciona da seguinte forma:
 
 ---
 
+## 🔌 Esquema Eletrônico
+
+O circuito foi montado no **Tinkercad**, conforme ilustrado abaixo:
+
+![Esquema do circuito no Tinkercad](https://github.com/MarcoM3l0/jogo-genius-sistemas-embarcados/blob/main/jogo-genius-sistemas-embarcados.png)
+
+### Componentes Utilizados
+- 1 × Arduino Uno
+- 4 × LEDs (representando as cores do jogo)
+- 4 × Botões
+- 4 × Resistores para LEDs (220 Ω)
+- 4 x Resistores para os botões (10 kΩ)
+- 1 × Buzzer
+- Protoboard e jumpers
+
+### Descrição do Circuito
+- Cada **LED** representa uma cor do jogo Genius.
+- Cada **botão** corresponde a um LED específico.
+- O **buzzer** fornece feedback sonoro para eventos como início de rodada, acerto, erro ou vitória.
+- Os resistores são utilizados para limitar a corrente nos LEDs e garantir leituras corretas nos botões.
+
+---
+
 ## 🧩 Funcionalidades
 
 - Geração de sequência aleatória
