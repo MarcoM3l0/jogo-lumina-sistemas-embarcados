@@ -89,6 +89,9 @@ int velocidade1 = 1000; // Delay entre rodadas
 int velocidade2 = 300;  // LED aceso na sequência
 int velocidade3 = 200;  // Intervalo entre LEDs
 
+// Máscara global dos leds para facilitar ligar/desligar todos os LEDs ao mesmo tempo
+const int ledsMascara = (1 << LED_VERMELHO) | (1 << LED_AMARELO) | (1 << LED_AZUL) | (1 << LED_VERDE);
+
 void setup()
 {
   // Configura LEDs (PD2, PD3, PD4, PD5) como saída
@@ -394,19 +397,13 @@ void venceuJogo() {
     tone(BUZZER, melodia[i], melodiaDuracao[i]);
 
     // Acende todos os leds simultaneamente usando registrador
-    PORTD |= (1 << LED_VERMELHO);
-    PORTD |= (1 << LED_AMARELO);
-    PORTD |= (1 << LED_AZUL);
-    PORTD |= (1 << LED_VERDE);
+    PORTD |= ledsMascara;
 
     // LEDs ficam acesos por apenas 15ms (pisca muito rápido - efeito estroboscópico)
     delay(15);
 
     // Apaga todos os leds usando registrador
-    PORTD &= ~(1 << LED_VERMELHO);
-    PORTD &= ~(1 << LED_AMARELO);
-    PORTD &= ~(1 << LED_AZUL);
-    PORTD &= ~(1 << LED_VERDE);
+    PORTD &= ~ledsMascara;
 
     // Pausa após a nota (define o ritmo da música)
     delay(melodiaPausa[i]);
@@ -440,19 +437,13 @@ void animacaoInicio() {
     tone(BUZZER, f, 100);
 
     // Acende todos os leds simultaneamente usando registrador
-    PORTD |= (1 << LED_VERMELHO);
-    PORTD |= (1 << LED_AMARELO);
-    PORTD |= (1 << LED_AZUL);
-    PORTD |= (1 << LED_VERDE);
+    PORTD |= ledsMascara;
 
     // Mantém LEDs acesos por 100ms (sincronizado com o som)
     delay(100);
 
     // Apaga todos os leds usando registrador
-    PORTD &= ~(1 << LED_VERMELHO);
-    PORTD &= ~(1 << LED_AMARELO);
-    PORTD &= ~(1 << LED_AZUL);
-    PORTD &= ~(1 << LED_VERDE);
+    PORTD &= ~ledsMascara;
 
     // Pausa de 100ms entre cada nota (cria o ritmo da animação)
     delay(100);
