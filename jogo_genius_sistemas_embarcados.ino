@@ -125,10 +125,16 @@ void loop()
       delay(10);
     }
 
+    // Reproduz animação visual e sonora indicando início do jogo
+    // Sequência de 5 notas ascendentes (300-700 Hz) com LEDs piscando
+    animacaoInicio();
+
     // Ativa o jogo para começar as rodadas
     jogoAtivo = true;
-    delay(1000);
   }
+
+  // Se jogoAtivo == false e BTN_INICIAR não foi pressionado:
+  // O loop continua verificando, mantendo o Arduino em modo de espera
 }
 
 
@@ -410,4 +416,50 @@ void venceuJogo() {
   }
 
   // Após a melodia, o jogo será resetado pelo loop principal
+}
+
+/*
+  Função chamada quando o jogador pressiona o botão iniciar
+  
+  Cria uma animação visual e sonora de boas-vindas que:
+  - Aumenta progressivamente a frequência do som (efeito "power up")
+  - Pisca todos os LEDs sincronizados com o som
+  - Indica ao jogador que o jogo está prestes a começar
+*/
+void animacaoInicio() {
+  /*
+    Loop que cria sequência ascendente de 5 notas
+    - f começa em 300 Hz (nota grave)
+    - incrementa 100 Hz a cada iteração
+    - termina em 700 Hz (nota mais aguda)
+    
+    Iterações: 300, 400, 500, 600, 700 Hz
+  */
+  for (int f = 300; f < 800; f += 100) {
+     // Toca a frequência atual por 100ms
+    tone(BUZZER, f, 100);
+
+    // Acende todos os leds simultaneamente usando registrador
+    PORTD |= (1 << LED_VERMELHO);
+    PORTD |= (1 << LED_AMARELO);
+    PORTD |= (1 << LED_AZUL);
+    PORTD |= (1 << LED_VERDE);
+
+    // Mantém LEDs acesos por 100ms (sincronizado com o som)
+    delay(100);
+
+    // Apaga todos os leds usando registrador
+    PORTD &= ~(1 << LED_VERMELHO);
+    PORTD &= ~(1 << LED_AMARELO);
+    PORTD &= ~(1 << LED_AZUL);
+    PORTD &= ~(1 << LED_VERDE);
+
+    // Pausa de 100ms entre cada nota (cria o ritmo da animação)
+    delay(100);
+  }
+  noTone(BUZZER);
+
+  // Pausa de 1 segundo antes de iniciar o jogo
+  // Dá tempo para o jogador se preparar mentalmente
+  delay(1000);
 }
