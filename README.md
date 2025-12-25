@@ -53,15 +53,16 @@ O circuito foi montado no **Tinkercad**, conforme ilustrado abaixo:
 ### Componentes Utilizados
 - 1 × Arduino Uno
 - 4 × LEDs (representando as cores do jogo)
-- 4 × Botões
+- 5 × Botões
 - 4 × Resistores para LEDs (220 Ω)
-- 4 x Resistores para os botões (10 kΩ)
+- 1 x Resistores para os botões (10 kΩ)
 - 1 × Buzzer
 - Protoboard e jumpers
 
 ### Descrição do Circuito
 - Cada **LED** representa uma cor do jogo Genius.
 - Cada **botão** corresponde a um LED específico.
+- Um **botão** correspondente ao start do jogo.
 - O **buzzer** fornece feedback sonoro para eventos como início de rodada, acerto, erro ou vitória.
 - Os resistores são utilizados para limitar a corrente nos LEDs e garantir leituras corretas nos botões.
 
