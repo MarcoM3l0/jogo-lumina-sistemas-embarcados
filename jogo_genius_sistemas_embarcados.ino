@@ -340,18 +340,14 @@ bool verificarJogada(int index) {
       tone(BUZZER, 70, 250);
 
       // Acende todos os 4 LEDs simultaneamente usando registrador
-      for(int x = 0; x < 4; x++){
-        PORTD |= (1 << leds[x]);  // Liga cada LED
-      }
+      PORTD |= ledsMascara;  // Liga cada LED
       
       delay(200);
       
       noTone(BUZZER);
 
       // Apaga todos os 4 LEDs usando registrador
-      for(int x = 0; x < 4; x++){
-        PORTD &= ~(1 << leds[x]); // Desliga cada LED
-      }
+      PORTD &= ~ledsMascara; // Desliga cada LED
 
       delay(200);
     }
