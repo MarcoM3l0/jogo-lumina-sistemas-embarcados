@@ -14,6 +14,10 @@ int btnAmarelo = 9;
 int btnAzul = 10;
 int btnVerde = 11;
 
+// Botão para iniciar o jogo
+// Quando pressionado, ativa o modo de jogo
+int btnIniciar = 6;
+
 // ========== ESTRUTURAS DE DADOS ==========
 /*
   Array que armazena a sequência do jogo (máximo 12 rodadas)
@@ -57,6 +61,16 @@ int botaoPressionado = 0;
 // Flag que indica se o jogador errou a sequência
 bool perdeuJogo = false;
 
+/*
+  Flag que controla o estado do jogo:
+  - false: Jogo em modo de espera (aguardando pressionar o botão iniciar)
+  - true: Jogo ativo (rodadas em andamento)
+  
+  Permite que o Arduino fique em modo de espera sem consumir recursos
+  até que o jogador pressione o botão de iniciar
+*/
+bool jogoAtivo = false;
+
 // ========== VARIÁVEIS DE VELOCIDADE/DIFICULDADE ==========
 /*
   Sistema de dificuldade progressiva:
@@ -86,6 +100,7 @@ void setup()
   pinMode(btnAmarelo, INPUT);
   pinMode(btnAzul, INPUT);
   pinMode(btnVerde, INPUT);
+  pinMode(btnIniciar, INPUT);
   
   // Inicializa o gerador de números aleatórios usando ruído da porta analógica
   // Isso garante que cada jogo terá uma sequência diferente
@@ -94,7 +109,39 @@ void setup()
 
 void loop()
 {
+  // Gerenciamento de estado do Jogo
+  if(jogoAtivo){
+    // Se o jogo está ativo, executa a lógica principal do Genius
+    jogoGenius();
+  }else if((digitalRead(btnIniciar) == 1) && !jogoAtivo){
+    // Se o jogo NÃO está ativo E o botão iniciar foi pressionado:
+
+    // Debounce: aguarda o jogador soltar o botão
+    // Evita que um único pressionamento seja contado múltiplas vezes
+    while(digitalRead(btnIniciar)){
+      delay(10);
+    }
+
+    // Ativa o jogo para começar as rodadas
+    jogoAtivo = true;
+  }
+}
+
+
+// ========== FUNÇÕES DO JOGO ==========
+
+/*
+  Lógica principal do Jogo Genius.
+  Gerencia todo o fluxo de uma partida do jogo:
+  - Adiciona novos passos à sequência
+  - Reproduz a sequência para o jogador
+  - Aguarda e valida as jogadas do jogador
+  - Controla progressão de dificuldade
+  - Detecta vitória ou derrota
   
+  Esta função só é executada quando jogoAtivo == true
+*/
+void  jogoGenius(){
   // Verifica se o jogador perdeu o jogo ou completou todas as rodadas
   if(perdeuJogo == true){
     // Se perdeu ou venceu, reseta tudo e começa um novo jogo
@@ -123,8 +170,6 @@ void loop()
   }
 }
 
-
-// ========== FUNÇÕES DO JOGO ==========
 /*
   Adiciona um novo passo aleatório à sequência
   - Sorteia um número de 0 a 3 (representando as 4 cores)
@@ -202,6 +247,7 @@ void limparJogo(){
     rodada = 0;
     passo = 0;
     perdeuJogo = false;
+    jogoAtivo = false;
 
     velocidade1 = 1000;
     velocidade2 = 300;
