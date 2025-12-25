@@ -146,28 +146,36 @@ void  jogoGenius(){
   if(perdeuJogo == true){
     // Se perdeu ou venceu, reseta tudo e começa um novo jogo
     limparJogo();
-  } else{
-    // Fluxo normal do jogo:
-    proximaRodada();        // 1. Adiciona um novo passo à sequência
-    reproduzirSequencia();  // 2. Mostra a sequência completa ao jogador
-    esperarJogador();       // 3. Aguarda o jogador repetir a sequência
-    
-    delay(velocidade1);
 
-    // Quando chegar na rodada 7, aumenta a dificuldade
-    // diminuindo os tempos de espera (jogo fica mais rápido)
-    if(rodada == 7){
-      velocidade1 = 500;
-      velocidade2 = 150;
-      velocidade3 = 100;
-    }
-
-    // Se o jogador completou todas as 12 rodadas, ele venceu!
-    if(rodada == 12){
-      venceuJogo();       // Toca melodia de vitória com show de luzes
-      perdeuJogo = true;  // Usa a mesma flag para resetar o jogo
-    }
+    // Retorna imediatamente para evitar que o código continue executando
+    return;
   }
+  // Fluxo normal do jogo:
+  proximaRodada();        // 1. Adiciona um novo passo à sequência
+  reproduzirSequencia();  // 2. Mostra a sequência completa ao jogador
+  esperarJogador();       // 3. Aguarda o jogador repetir a sequência
+  
+  // Verifica se o jogador errou durante esperarJogador()
+  // Se errou, retorna imediatamente sem executar o resto do código
+  // Isso evita que o jogo continue processando após uma derrota
+  if(perdeuJogo) return;
+
+  delay(velocidade1);
+
+  // Quando chegar na rodada 7, aumenta a dificuldade
+  // diminuindo os tempos de espera (jogo fica mais rápido)
+  if(rodada == 7){
+    velocidade1 = 500;
+    velocidade2 = 150;
+    velocidade3 = 100;
+  }
+
+  // Se o jogador completou todas as 12 rodadas, ele venceu!
+  if(rodada == 12){
+    venceuJogo();       // Toca melodia de vitória com show de luzes
+    perdeuJogo = true;  // Usa a mesma flag para resetar o jogo
+  }
+  
 }
 
 /*
