@@ -1,22 +1,22 @@
 // ========== CONFIGURAÇÃO DE HARDWARE ==========
-// Pinos dos LEDs
-int ledVermelho = 2;
-int ledAmarelo = 3;
-int ledAzul = 4;
-int ledVerde = 5;
+// Pinos dos LEDs (todos no Port D)
+#define LED_VERMELHO  PD2 // Pino 2 (bit 2 do PORTD)
+#define LED_AMARELO   PD3 // Pino 3 (bit 3 do PORTD)
+#define LED_AZUL      PD4 // Pino 4 (bit 4 do PORTD)
+#define LED_VERDE     PD5 // Pino 5 (bit 5 do PORTD)
 
-// Pino do Buzzer
-int buzzer = 7;
+// Pino do Buzzer (Port D)
+#define BUZZER        PD7 // Pino 7 (bit 7 do PORTD)
 
-// Pinos dos Botões
-int btnVermelho = 8;
-int btnAmarelo = 9;
-int btnAzul = 10;
-int btnVerde = 11;
+// Pinos dos Botões (todos no Port B)
+#define BTN_VERMELHO  PB0  // Pino 8  (bit 0 do PORTB)
+#define BTN_AMARELO   PB1  // Pino 9  (bit 1 do PORTB)
+#define BTN_AZUL      PB2  // Pino 10 (bit 2 do PORTB)
+#define BTN_VERDE     PB3  // Pino 11 (bit 3 do PORTB)
 
-// Botão para iniciar o jogo
+// Botão para iniciar o jogo (Port D)
 // Quando pressionado, ativa o modo de jogo
-int btnIniciar = 6;
+#define BTN_INICIAR   PD6 // Pino 6 (bit 6 do PORTD)
 
 // ========== ESTRUTURAS DE DADOS ==========
 /*
@@ -32,26 +32,31 @@ int sequencia[12] = {};
 
 // Array com os pinos dos botões na mesma ordem dos LEDs
 // Facilita o acesso aos botões através de índices
-int botoes[4] = {btnVermelho, btnAmarelo, btnAzul, btnVerde};
+// Marcado como const para economizar RAM
+const int botoes[4] = {BTN_VERMELHO, BTN_AMARELO, BTN_AZUL, BTN_VERDE};
 
 // Array com os pinos dos LEDs na mesma ordem
 // Permite acender qualquer LED usando: leds[numero]
-int leds[4] = {ledVermelho, ledAmarelo, ledAzul, ledVerde};
+// Marcado como const para economizar RAM
+const int leds[4] = {LED_VERMELHO, LED_AMARELO, LED_AZUL, LED_VERDE};
 
 // Array com as frequências de som para cada LED
 // Cada LED toca uma nota musical diferente: RÉ, FÁ, MI, DÓ
-int tons[4] = {294, 349, 330, 262};
+// Marcado como const para economizar RAM
+const int tons[4] = {294, 349, 330, 262};
 
 // ========== VARIÁVEIS DE CONTROLE DO JOGO ==========
 /*
   Contador de rodadas:
   - indica quantos passos já foram adicionados à sequência
+  - Quando chega a 12, o jogador venceu o jogo
 */
 int rodada = 0;
 
 /*
   Contador de passos:
   - usado para verificar em qual posição da sequência o jogador está
+  - Incrementado a cada acerto do jogador
 */
 int passo = 0;
 
@@ -80,27 +85,25 @@ bool jogoAtivo = false;
   
   Quanto menores os valores, mais rápido e difícil fica o jogo
 */
-int velocidade1 = 1000;
-int velocidade2 = 300;
-int velocidade3 = 200;
+int velocidade1 = 1000; // Delay entre rodadas
+int velocidade2 = 300;  // LED aceso na sequência
+int velocidade3 = 200;  // Intervalo entre LEDs
 
 void setup()
 {
-  // Configura todos os LEDs como saída 
-  pinMode(ledVermelho, OUTPUT);
-  pinMode(ledAmarelo, OUTPUT);
-  pinMode(ledAzul, OUTPUT);
-  pinMode(ledVerde, OUTPUT);
+  // Configura LEDs (PD2, PD3, PD4, PD5) como saída
+  // Combina múltiplos bits usando OR (|) para configurar todos de uma vez
+  DDRD |= (1 << LED_VERMELHO) | (1 << LED_AMARELO) | (1 << LED_AZUL) | (1 << LED_VERDE);
   
-  // Configura o Buzzer como saída
-  pinMode(buzzer, OUTPUT);
+  // Configura o Buzzer (PD7) como saída
+  DDRD |= (1 << BUZZER);
   
-  // Configura todos os botões como entrada
-  pinMode(btnVermelho, INPUT);
-  pinMode(btnAmarelo, INPUT);
-  pinMode(btnAzul, INPUT);
-  pinMode(btnVerde, INPUT);
-  pinMode(btnIniciar, INPUT);
+  // Configura botão iniciar (PD6) como entrada
+  // &= ~(NOT) zera o bit, configurando como entrada
+  DDRD &= ~(1 << BTN_INICIAR);
+
+  // Configura botões de jogo (PB0, PB1, PB2, PB3) como entrada
+  DDRB &= ~( (1 << BTN_VERMELHO) | (1 << BTN_AMARELO) | (1 << BTN_AZUL) | (1 << BTN_VERDE));
   
   // Inicializa o gerador de números aleatórios usando ruído da porta analógica
   // Isso garante que cada jogo terá uma sequência diferente
@@ -113,17 +116,18 @@ void loop()
   if(jogoAtivo){
     // Se o jogo está ativo, executa a lógica principal do Genius
     jogoGenius();
-  }else if((digitalRead(btnIniciar) == 1) && !jogoAtivo){
+  }else if((PIND & (1 << BTN_INICIAR  )) && !jogoAtivo){
     // Se o jogo NÃO está ativo E o botão iniciar foi pressionado:
 
     // Debounce: aguarda o jogador soltar o botão
     // Evita que um único pressionamento seja contado múltiplas vezes
-    while(digitalRead(btnIniciar)){
+    while(PIND & (1 << BTN_INICIAR  )){
       delay(10);
     }
 
     // Ativa o jogo para começar as rodadas
     jogoAtivo = true;
+    delay(1000);
   }
 }
 
@@ -144,7 +148,7 @@ void loop()
 void  jogoGenius(){
   // Verifica se o jogador perdeu o jogo ou completou todas as rodadas
   if(perdeuJogo == true){
-    // Se perdeu ou venceu, reseta tudo e começa um novo jogo
+    // Se perdeu ou venceu, reseta tudo e volta ao modo de espera
     limparJogo();
 
     // Retorna imediatamente para evitar que o código continue executando
@@ -157,9 +161,9 @@ void  jogoGenius(){
   
   // Verifica se o jogador errou durante esperarJogador()
   // Se errou, retorna imediatamente sem executar o resto do código
-  // Isso evita que o jogo continue processando após uma derrota
   if(perdeuJogo) return;
 
+  // Delay entre rodadas
   delay(velocidade1);
 
   // Quando chegar na rodada 7, aumenta a dificuldade
@@ -186,7 +190,7 @@ void  jogoGenius(){
 */
 void proximaRodada(){
   sequencia[rodada] = random(4);
-  rodada += 1;
+  rodada ++;
 }
 
 /*
@@ -199,13 +203,14 @@ void reproduzirSequencia(){
   
   for(int i = 0; i < rodada; i++){
     
-    tone(7, tons[sequencia[i]], 250);
-    digitalWrite(leds[sequencia[i]], 1);
+    // Toca o som correspondente ao LED atual
+    tone(BUZZER, tons[sequencia[i]], 250);
+    PORTD |= (1 << leds[sequencia[i]]); // Liga o Led
     
     delay(velocidade2);
     
-    noTone(7);
-    digitalWrite(leds[sequencia[i]], 0);
+    noTone(BUZZER);
+    PORTD &= ~(1 << leds[sequencia[i]]);  // Desliga o Led
     delay(velocidade3);
   }
   
@@ -232,7 +237,7 @@ void esperarJogador(){
     if(verificarJogada(i)) break;
     
     // Se acertou, avança para o próximo passo
-    passo += 1;
+    passo ++;
   }
   
   // Reseta o contador de passos para a próxima rodada
@@ -248,15 +253,20 @@ void esperarJogador(){
 */
 void limparJogo(){
 
+  // Limpa toda a sequência armazenada
   for(int i = 0; i < 12; i++){
     sequencia[i] = 0;
   }
 
+    // Reseta variáveis de controle do jogo
     rodada = 0;
     passo = 0;
     perdeuJogo = false;
+
+    // Volta para o modo de espera até que o botão iniciar seja pressionado novamente
     jogoAtivo = false;
 
+    // Volta a dificuldade para o nível inicial
     velocidade1 = 1000;
     velocidade2 = 300;
     velocidade3 = 200;
@@ -273,21 +283,25 @@ void limparJogo(){
 */
 bool jogadaUsuario() {
 
+  // Loop que verifica cada um dos 4 botões
   for(int i = 0; i <= 3; i++){
-    if(digitalRead(botoes[i]) == 1){
+
+    if(PINB & (1 << botoes[i])){
       botaoPressionado = i; // Armazena qual botão foi pressionado
       
-      tone(7, tons[i], 250);
-      digitalWrite(leds[i], 1);
+      // Feedback visual e sonoro ao jogador
+      tone(BUZZER, tons[i], 250);
+      PORTD |= (1 << leds[botaoPressionado]); // Liga o led
         
       delay(300);
       
-      digitalWrite(leds[botaoPressionado], 0);
-      noTone(7);
+      // Apaga o LED e para o som
+      PORTD &= ~(1 << leds[botaoPressionado]); // Desliga o led
+      noTone(BUZZER);
 
       // Debounce: aguarda o jogador soltar o botão
       // Evita que um único pressionamento seja contado múltiplas vezes
-      while(digitalRead(botoes[i]) == 1){
+      while(PINB & (1 << botoes[i])){
         delay(10);
       }
 
@@ -308,21 +322,26 @@ bool jogadaUsuario() {
 */
 bool verificarJogada(int index) {
 
+  // Compara se o botão pressionado corresponde ao esperado na sequência
   if(sequencia[index] != botaoPressionado){
 
     // Animação de derrota: pisca todos os LEDs 3 vezes com som grave
+    // Pisca todos os LEDs 3 vezes com som grave indicando erro
     for(int i = 0; i < 3; i++){
-      tone(7, 70, 250);
+      tone(BUZZER, 70, 250);
 
+      // Acende todos os 4 LEDs simultaneamente usando registrador
       for(int x = 0; x < 4; x++){
-        digitalWrite(leds[x], 1);
+        PORTD |= (1 << leds[x]);  // Liga cada LED
       }
       
       delay(200);
       
-      noTone(7);
+      noTone(BUZZER);
+
+      // Apaga todos os 4 LEDs usando registrador
       for(int x = 0; x < 4; x++){
-        digitalWrite(leds[x], 0);
+        PORTD &= ~(1 << leds[x]); // Desliga cada LED
       }
 
       delay(200);
@@ -339,13 +358,13 @@ bool verificarJogada(int index) {
 /*
   Função chamada quando o jogador completa todas as 12 rodadas
   
-  Reproduz uma melodia de vitória (tema do Super Mario Bros) com show de luzes:
+  Reproduz uma versão abreviada do tema de Super Mario Bros com show de luzes:
   - melodia[]: array com as frequências das notas musicais
   - melodiaDuracao[]: duração de cada nota
   - melodiaPausa[]: pausa após cada nota
   
-  Durante a melodia, todos os LEDs piscam sincronizados com a música
-  criando um efeito visual de celebração
+  Durante a melodia, todos os LEDs piscam rapidamente usando PORTD
+  criando um efeito estroboscópico de celebração
 */
 void venceuJogo() {
 
@@ -362,27 +381,33 @@ void venceuJogo() {
   // Controla o intervalo entre as notas para criar o ritmo
   int melodiaPausa[] = {150, 300, 300, 100, 300, 550, 575, 450, 400, 500, 300, 330, 150, 300};
  
-  // Reprodução da melodia e o show de luzes
+  // Loop que percorre todas as 14 notas da melodia de vitória
   for(int i = 0; i < 14; i++){
-    tone(7, melodia[i], melodiaDuracao[i]);
 
-    digitalWrite(ledVermelho, 1);
-    digitalWrite(ledAmarelo, 1);
-    digitalWrite(ledAzul, 1);
-    digitalWrite(ledVerde, 1);
+    // Toca a nota atual com sua duração específica
+    tone(BUZZER, melodia[i], melodiaDuracao[i]);
 
+    // Acende todos os leds simultaneamente usando registrador
+    PORTD |= (1 << LED_VERMELHO);
+    PORTD |= (1 << LED_AMARELO);
+    PORTD |= (1 << LED_AZUL);
+    PORTD |= (1 << LED_VERDE);
+
+    // LEDs ficam acesos por apenas 15ms (pisca muito rápido - efeito estroboscópico)
     delay(15);
 
-    digitalWrite(ledVermelho, 0);
-    digitalWrite(ledAmarelo, 0);
-    digitalWrite(ledAzul, 0);
-    digitalWrite(ledVerde, 0);
+    // Apaga todos os leds usando registrador
+    PORTD &= ~(1 << LED_VERMELHO);
+    PORTD &= ~(1 << LED_AMARELO);
+    PORTD &= ~(1 << LED_AZUL);
+    PORTD &= ~(1 << LED_VERDE);
 
+    // Pausa após a nota (define o ritmo da música)
     delay(melodiaPausa[i]);
 
-    noTone(7);
+    // Para o som antes da próxima nota
+    noTone(BUZZER);
   }
 
   // Após a melodia, o jogo será resetado pelo loop principal
-  delay(2000);
 }
