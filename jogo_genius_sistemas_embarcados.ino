@@ -1,3 +1,12 @@
+/*
+	LiquidCrystal_I2C: 
+    Biblioteca para controlar displays LCD via protocolo I2C
+*/ 
+#include <LiquidCrystal_I2C.h>
+
+// Inicialização do objeto LCD com comunicação I2C
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
 // ========== CONFIGURAÇÃO DE HARDWARE ==========
 // Pinos dos LEDs (todos no Port D)
 #define LED_VERMELHO  PD2 // Pino 2 (bit 2 do PORTD)
@@ -17,6 +26,11 @@
 // Botão para iniciar o jogo (Port D)
 // Quando pressionado, ativa o modo de jogo
 #define BTN_INICIAR   PD6 // Pino 6 (bit 6 do PORTD)
+
+// Botão para acessar o menu de dificuldade (Port B)
+// Permite ao jogador escolher entre Fácil, Médio e Difícil
+// A cada pressionamento, cicla entre os 3 níveis de dificuldade
+#define BTN_MENU     PB4 // Pino 12 (bit 4 do PORTB)
 
 // ========== ESTRUTURAS DE DADOS ==========
 /*
@@ -76,24 +90,82 @@ bool perdeuJogo = false;
 */
 bool jogoAtivo = false;
 
-// ========== VARIÁVEIS DE VELOCIDADE/DIFICULDADE ==========
+// ========== SISTEMA DE DIFICULDADE ==========
 /*
-  Sistema de dificuldade progressiva:
-  - velocidade1: delay entre rodadas (quanto tempo espera antes da próxima rodada)
-  - velocidade2: tempo que o LED fica aceso ao reproduzir a sequência
-  - velocidade3: intervalo entre LEDs na sequência
+  Sistema de dificuldade dinâmica com 3 níveis:
+  
+  Os valores de velocidade são aplicados pela função aplicarDificuldade()
+  conforme o nível selecionado pelo jogador:
+  
+  FÁCIL (nivelDificuldade = 0):
+  - velocidade1: 1500ms (1.5s entre rodadas - mais tempo para pensar)
+  - velocidade2: 400ms (LEDs ficam acesos mais tempo - mais fácil de ver)
+  - velocidade3: 250ms (mais intervalo entre LEDs - sequência mais clara)
+  
+  MÉDIO (nivelDificuldade = 1):
+  - velocidade1: 1000ms (1s entre rodadas - tempo padrão)
+  - velocidade2: 300ms (LEDs acesos tempo padrão)
+  - velocidade3: 200ms (intervalo padrão entre LEDs)
+  
+  DIFÍCIL (nivelDificuldade = 2):
+  - velocidade1: 700ms (0.7s entre rodadas - pouco tempo para pensar)
+  - velocidade2: 200ms (LEDs acesos rapidamente - difícil de acompanhar)
+  - velocidade3: 150ms (pouco intervalo - sequência muito rápida)
   
   Quanto menores os valores, mais rápido e difícil fica o jogo
+  
+  PROGRESSÃO ADICIONAL:
+  Na rodada 7, as velocidades são reduzidas em 20% automaticamente,
+  aumentando ainda mais a dificuldade independente do nível inicial
 */
-int velocidade1 = 1000; // Delay entre rodadas
-int velocidade2 = 300;  // LED aceso na sequência
-int velocidade3 = 200;  // Intervalo entre LEDs
+int velocidade1 = 0; // Delay entre rodadas (será definido por aplicarDificuldade())
+int velocidade2 = 0; // LED aceso na sequência (será definido por aplicarDificuldade())
+int velocidade3 = 0; // Intervalo entre LEDs (será definido por aplicarDificuldade())
+
+/*
+  Armazena o nível de dificuldade selecionado pelo jogador
+  
+  Valores possíveis:
+  - 0 = FÁCIL (velocidades mais lentas, mais tempo para pensar)
+  - 1 = MÉDIO (velocidades padrão, equilíbrio entre desafio e jogabilidade)
+  - 2 = DIFÍCIL (velocidades rápidas, requer reflexos aguçados)
+  
+  O valor é alterado no menu de dificuldade através do botão BTN_MENU
+  e aplicado pela função aplicarDificuldade() antes do jogo iniciar
+*/
+int nivelDificuldade = 0; 
+
+/*
+  Flag que controla se o menu de dificuldade está ativo
+  
+  Estados:
+  - true: Menu de dificuldade visível no LCD
+           Jogador pode navegar com BTN_MENU e confirmar com BTN_INICIAR
+           Função menuDificuldade() está em execução
+  - false: Menu fechado, jogo em andamento
+  
+  Ciclo de vida:
+  1. Inicia como true no setup()
+  2. Permanece true até jogador pressionar BTN_INICIAR
+  3. Muda para false quando jogo começa
+  4. Volta para true quando jogo termina (vitória ou derrota)
+*/
+bool menuDificuldadeAtivo = true;
+;
 
 // Máscara global dos leds para facilitar ligar/desligar todos os LEDs ao mesmo tempo
 const int ledsMascara = (1 << LED_VERMELHO) | (1 << LED_AMARELO) | (1 << LED_AZUL) | (1 << LED_VERDE);
 
 void setup()
-{
+{ 
+  /*
+    Sequência de inicialização do display LCD:
+    1. init() - Inicializa a comunicação I2C com o display
+    2. backlight() - Liga a luz de fundo do display para visualização
+  */
+  lcd.init();
+  lcd.backlight(); 
+
   // Configura LEDs (PD2, PD3, PD4, PD5) como saída
   // Combina múltiplos bits usando OR (|) para configurar todos de uma vez
   DDRD |= (1 << LED_VERMELHO) | (1 << LED_AMARELO) | (1 << LED_AZUL) | (1 << LED_VERDE);
@@ -101,12 +173,14 @@ void setup()
   // Configura o Buzzer (PD7) como saída
   DDRD |= (1 << BUZZER);
   
-  // Configura botão iniciar (PD6) como entrada
+  // Configura botão iniciar (PD6) e botão menu (PB4) como entrada
   // &= ~(NOT) zera o bit, configurando como entrada
   DDRD &= ~(1 << BTN_INICIAR);
+  DDRB &= ~(1 << BTN_MENU);
 
-  // Habilita resistor de pull-up interno para o botão iniciar
+  // Habilita resistores de pull-up internos para os botões iniciar e menu
   PORTD |= (1 << BTN_INICIAR); 
+  PORTB |= (1 << BTN_MENU);
 
   // Configura botões de jogo (PB0, PB1, PB2, PB3) como entrada
   DDRB &= ~( (1 << BTN_VERMELHO) | (1 << BTN_AMARELO) | (1 << BTN_AZUL) | (1 << BTN_VERDE));
@@ -121,29 +195,25 @@ void setup()
 
 void loop()
 {
-  // Gerenciamento de estado do Jogo
-  if(jogoAtivo){
-    // Se o jogo está ativo, executa a lógica principal do Genius
-    jogoGenius();
-  }else if(!(PIND & (1 << BTN_INICIAR  )) && !jogoAtivo){
-    // Se o jogo NÃO está ativo E o botão iniciar foi pressionado:
-
-    // Debounce: aguarda o jogador soltar o botão
-    // Evita que um único pressionamento seja contado múltiplas vezes
-    while(!(PIND & (1 << BTN_INICIAR  ))){
-      delay(10);
-    }
-
-    // Reproduz animação visual e sonora indicando início do jogo
-    // Sequência de 5 notas ascendentes (300-700 Hz) com LEDs piscando
-    animacaoInicio();
-
-    // Ativa o jogo para começar as rodadas
-    jogoAtivo = true;
-  }
-
-  // Se jogoAtivo == false e BTN_INICIAR não foi pressionado:
-  // O loop continua verificando, mantendo o Arduino em modo de espera
+  /*
+    O jogo opera em dois estados principais:
+    
+    ESTADO 1 - MENU DE DIFICULDADE (jogoAtivo = false):
+    - Exibe opções de dificuldade no LCD
+    - Aguarda seleção do jogador via BTN_MENU
+    - Aguarda confirmação via BTN_INICIAR
+    
+    ESTADO 2 - JOGO ATIVO (jogoAtivo = true):
+    - Executa a lógica principal do Genius
+    - Gerencia rodadas, sequências e validações
+    - Detecta vitória ou derrota
+    
+    Transições:
+    - Menu → Jogo: quando BTN_INICIAR é pressionado no menu
+    - Jogo → Menu: quando jogo termina (vitória ou derrota)
+  */
+  if(jogoAtivo) jogoGenius();
+  else menuDificuldade();
 }
 
 
@@ -161,19 +231,24 @@ void loop()
   Esta função só é executada quando jogoAtivo == true
 */
 void  jogoGenius(){
+
   // Verifica se o jogador perdeu o jogo ou completou todas as rodadas
   if(perdeuJogo == true){
+
     // Se perdeu ou venceu, reseta tudo e volta ao modo de espera
     limparJogo();
 
     // Retorna imediatamente para evitar que o código continue executando
+    // após limpar o jogo
     return;
   }
+
   // Fluxo normal do jogo:
-  proximaRodada();        // 1. Adiciona um novo passo à sequência
-  reproduzirSequencia();  // 2. Mostra a sequência completa ao jogador
-  esperarJogador();       // 3. Aguarda o jogador repetir a sequência
-  
+  proximaRodada();       // 1. Adiciona um novo passo à sequência
+  visorRodadas();        // 2. Atualiza o LCD com a rodada atual
+  reproduzirSequencia(); // 3. Mostra a sequência completa ao jogador
+  esperarJogador();      // 4. Aguarda o jogador repetir a sequência
+
   // Verifica se o jogador errou durante esperarJogador()
   // Se errou, retorna imediatamente sem executar o resto do código
   if(perdeuJogo) return;
@@ -181,18 +256,22 @@ void  jogoGenius(){
   // Delay entre rodadas
   delay(velocidade1);
 
-  // Quando chegar na rodada 7, aumenta a dificuldade
-  // diminuindo os tempos de espera (jogo fica mais rápido)
+  /*
+    Na rodada 7, aumenta automaticamente a dificuldade reduzindo
+    os tempos de espera em 20%, independente do nível inicial selecionado.
+  */
   if(rodada == 7){
-    velocidade1 = 500;
-    velocidade2 = 150;
-    velocidade3 = 100;
+    velocidade1 -= (velocidade1 * 20) / 100; // Reduz 20% do valor atual
+    velocidade2 -= (velocidade2 * 20) / 100; // Reduz 20% do valor atual
+    velocidade3 -= (velocidade3 * 20) / 100; // Reduz 20% do valor atual
   }
 
   // Se o jogador completou todas as 12 rodadas, ele venceu!
-  if(rodada == 12){
+  // Exibe mensagem de vitória e toca melodia especial
+  if(rodada == 2){
+    visorVitoria();    // Exibe mensagem de vitória no LCD
     venceuJogo();       // Toca melodia de vitória com show de luzes
-    perdeuJogo = true;  // Usa a mesma flag para resetar o jogo
+    perdeuJogo = true;  // Usa a mesma flag de derrota para resetar o jogo
   }
   
 }
@@ -212,20 +291,25 @@ void proximaRodada(){
   Reproduz a sequência completa para o jogador
   - Percorre todos os passos da sequência atual
   - Para cada passo: acende o LED correspondente e toca seu som
-  - Adiciona delays para tornar visível cada passo
+  - Utiliza as variáveis de velocidade definidas pela dificuldade selecionada
 */
 void reproduzirSequencia(){
   
+  // Loop que percorre toda a sequência acumulada até agora
   for(int i = 0; i < rodada; i++){
     
     // Toca o som correspondente ao LED atual
     tone(BUZZER, tons[sequencia[i]], 250);
     PORTD |= (1 << leds[sequencia[i]]); // Liga o Led
     
+    // Mantém LED aceso (tempo varia conforme dificuldade)
     delay(velocidade2);
     
+    // Para o som e desliga o LED
     noTone(BUZZER);
     PORTD &= ~(1 << leds[sequencia[i]]);  // Desliga o Led
+
+    // Intervalo entre LEDs (varia conforme dificuldade)
     delay(velocidade3);
   }
   
@@ -239,6 +323,7 @@ void reproduzirSequencia(){
 */
 void esperarJogador(){
   
+  // Loop que aguarda cada passo da sequência ser repetido
   for (int i = 0; i < rodada; i++){
     bool jogou = false;
     
@@ -264,7 +349,8 @@ void esperarJogador(){
   - Zera todo o array de sequência
   - Reseta contadores de rodada e passo
   - Desativa a flag de derrota
-  - Adiciona pausa antes de recomeçar
+  - Reativa o menu de dificuldade
+  - Restaura velocidades padrão (serão redefinidas ao selecionar dificuldade)
 */
 void limparJogo(){
 
@@ -278,13 +364,23 @@ void limparJogo(){
     passo = 0;
     perdeuJogo = false;
 
-    // Volta para o modo de espera até que o botão iniciar seja pressionado novamente
+    /*
+      Após o jogo terminar (vitória ou derrota):
+      1. jogoAtivo = false → sai do modo de jogo
+      2. menuDificuldadeAtivo = true → reativa o menu de seleção
+      
+      Isso permite ao jogador escolher nova dificuldade antes de jogar novamente
+    */
     jogoAtivo = false;
+    menuDificuldadeAtivo = true;
 
-    // Volta a dificuldade para o nível inicial
-    velocidade1 = 1000;
-    velocidade2 = 300;
-    velocidade3 = 200;
+    /*
+      Reseta os valores de velocidade (serão sobrescritos por aplicarDificuldade()
+      quando jogador selecionar nova dificuldade)
+    */
+    velocidade1 = 0;
+    velocidade2 = 0;
+    velocidade3 = 0;
 }
 
 /*
@@ -332,7 +428,7 @@ bool jogadaUsuario() {
 /*
   Verifica se a jogada do usuário está correta
   - Compara o botão pressionado com o passo correto da sequência
-  - Se errou: toca som de erro, pisca todos os LEDs e marca perdeuJogo
+  - Se errou: exibe mensagem de derrota, toca som de erro, pisca todos os LEDs e marca perdeuJogo
   - Retorna true se errou (para encerrar o loop), false se acertou
 */
 bool verificarJogada(int index) {
@@ -340,20 +436,22 @@ bool verificarJogada(int index) {
   // Compara se o botão pressionado corresponde ao esperado na sequência
   if(sequencia[index] != botaoPressionado){
 
-    // Animação de derrota: pisca todos os LEDs 3 vezes com som grave
+    visorDerrota(); // Exibe mensagem de derrota no LCD
+
     // Pisca todos os LEDs 3 vezes com som grave indicando erro
     for(int i = 0; i < 3; i++){
+
       tone(BUZZER, 70, 250);
 
-      // Acende todos os 4 LEDs simultaneamente usando registrador
-      PORTD |= ledsMascara;  // Liga cada LED
+      // Liga todos os 4 LEDs simultaneamente usando registrador
+      PORTD |= ledsMascara;
       
       delay(200);
       
       noTone(BUZZER);
 
-      // Apaga todos os 4 LEDs usando registrador
-      PORTD &= ~ledsMascara; // Desliga cada LED
+      // Desliga todos os 4 LEDs simultaneamente usando registrador
+      PORTD &= ~ledsMascara;
 
       delay(200);
     }
@@ -370,29 +468,26 @@ bool verificarJogada(int index) {
   Função chamada quando o jogador completa todas as 12 rodadas
   
   Reproduz uma versão abreviada do tema de Super Mario Bros com show de luzes:
-  - melodia[]: array com as frequências das notas musicais
+  - melodia[]: frequências das 7 primeiras notas
   - melodiaDuracao[]: duração de cada nota
   - melodiaPausa[]: pausa após cada nota
   
-  Durante a melodia, todos os LEDs piscam rapidamente usando PORTD
-  criando um efeito estroboscópico de celebração
+  Durante a melodia, todos os LEDs piscam rapidamente criando efeito estroboscópico
 */
 void venceuJogo() {
 
   // ========== ARRAYS DA MELODIA DE VITÓRIA ==========
-  // Array com as frequências das 14 primeiras notas do tema do Super Mario Bros
+  // Array com as frequências das 7 primeiras notas do tema do Super Mario Bros
   // Versão reduzida para economizar memória RAM do Arduino
   int melodia[] = {660, 660, 660, 510, 660, 770, 380};
 
-  // Array com a duração de cada nota
-  // Controla por quanto tempo cada nota será tocada
+  // Array com a duração de cada uma das 7 notas
   int melodiaDuracao[] = {100, 100, 100, 100, 100, 100, 100};
 
-  // Array com a pausa após cada nota
-  // Controla o intervalo entre as notas para criar o ritmo
+  // Array com a pausa de cada uma das 7 notas
   int melodiaPausa[] = {150, 300, 300, 100, 300, 550, 575};
  
-  // Loop que percorre todas as 14 notas da melodia de vitória
+  // Loop que percorre todas as 7 notas da melodia de vitória
   for(int i = 0; i < 7; i++){
 
     // Toca a nota atual com sua duração específica
@@ -455,4 +550,157 @@ void animacaoInicio() {
   // Pausa de 1 segundo antes de iniciar o jogo
   // Dá tempo para o jogador se preparar mentalmente
   delay(1000);
+}
+
+/*
+  Esta função é chamada quando o jogador confirma a dificuldade no menu
+  através do botão BTN_INICIAR. Ela configura os três parâmetros de velocidade
+  que controlam o ritmo do jogo.
+*/
+void aplicarDificuldade(){
+  switch(nivelDificuldade){
+    case 0: // Fácil
+      velocidade1 = 1500;
+      velocidade2 = 400;
+      velocidade3 = 250;
+      break;
+    case 1: // Médio
+      velocidade1 = 1000;
+      velocidade2 = 300;
+      velocidade3 = 200;
+      break;
+    case 2: // Difícil
+      velocidade1 = 700;
+      velocidade2 = 200;
+      velocidade3 = 150;
+      break;
+  }
+}
+
+/* 
+  Interface interativa no LCD que permite ao jogador escolher o nível de dificuldade
+
+  FUNCIONALIDADE:
+  - Exibe "Dificuldade:" na linha 1 do LCD
+  - Mostra o nível atual com indicador "> " na linha 2
+  - BTN_MENU: navega entre FACIL → MEDIO → DIFICIL → FACIL (cíclico)
+  - BTN_INICIAR: confirma seleção e inicia o jogo
+*/
+void menuDificuldade(){
+  
+  // Array constante com os textos de cada nível de dificuldade
+  const char* niveis[3] = {"FACIL", "MEDIO", "DIFICIL"};
+
+  //Inicializa o display do menu de dificuldade
+  lcd.clear();               // Limpa o display 
+  lcd.setCursor(0, 0);       // Move o cursor para a linha 1, coluna 0
+  lcd.print("Dificuldade:"); // Exibe título na linha 1
+
+  /*
+    Este loop continua executando enquanto menuDificuldadeAtivo for true
+
+    Dentro do loop:
+    1. Atualiza display com nível atual
+    2. Verifica se BTN_MENU foi pressionado (para navegar)
+    3. Verifica se BTN_INICIAR foi pressionado (para confirmar)
+
+    O loop só termina quando jogador pressiona BTN_INICIAR,
+    que define menuDificuldadeAtivo = false e inicia o jogo
+  */
+  while(menuDificuldadeAtivo){
+
+    // Atualiza a linha 2 do display com o nível selecionado
+    lcd.setCursor(0, 1);                 // Move o cursor para a linha 2, coluna 0
+    lcd.print("> ");                     // Indicador de seleção
+    lcd.print(niveis[nivelDificuldade]); // Exibe o nível atual
+    lcd.print("       ");                // Limpa o resto da linha         
+
+    // Verifica se o botão de menu foi pressionado para mudar o nível
+    if(!(PINB & (1 << BTN_MENU ))){
+      
+      // Debounce - aguarda o botão ser solto
+      while(!(PINB & (1 << BTN_MENU ))){
+        delay(10);
+      }
+      
+      // Incrementa o nível de dificuldade (cíclico)
+      nivelDificuldade++;
+
+      /*
+        Navegação cíclica
+
+        Se passar de 2 (DIFÍCIL), volta para 0 (FÁCIL)
+        Permite navegar infinitamente: FACIL → MEDIO → DIFICIL → FACIL → ...
+      */
+      if(nivelDificuldade > 2) nivelDificuldade = 0;
+    }
+
+    // Quando BTN_INICIAR é pressionado, inicia o jogo com a dificuldade selecionada
+    if(!(PIND & (1 << BTN_INICIAR  ))){
+
+      // Debounce - aguarda o botão ser solto
+      while(!(PIND & (1 << BTN_INICIAR  ))){
+        delay(10);
+      }
+
+      // Define velocidade1, velocidade2 e velocidade3 baseado em nivelDificuldade
+      aplicarDificuldade();
+
+      // Sai do loop while, permitindo que o jogo inicie
+      menuDificuldadeAtivo = false;
+
+      //Feedback visual no LCD indicando o nível selecionado
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Nivel: ");
+      lcd.print(niveis[nivelDificuldade]);
+
+      // Reproduz animação visual e sonora indicando início do jogo
+      // Sequência de 5 notas ascendentes (300-700 Hz) com LEDs piscando
+      animacaoInicio();
+
+      // Muda o estado para jogoAtivo = true
+      // Na próxima iteração do loop(), jogoGenius() será executado
+      jogoAtivo = true;
+    }
+
+    // Pequeno delay para evitar leituras muito rápidas do botão
+    delay(100);
+  }
+}
+
+/*
+  Interface no LCD que exibe a rodada atual do jogo
+  - Atualiza a linha 2 do LCD com o texto "Rodada: X"
+  - Onde X é o número da rodada atual (1 a 12)
+*/
+void visorRodadas(){
+  lcd.setCursor(0, 1);     // Linha 2
+  lcd.print("Rodada: ");
+  lcd.print(rodada);
+  lcd.print("   ");       // Limpa possíveis restos
+}
+
+/*
+  Interfaces no LCD que exibe mensagem de vitória
+  - visorVitoria(): Exibe "Voce VENCEU!" e "Parabens!!!"
+*/
+void visorVitoria(){
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("  Voce VENCEU!");
+  lcd.setCursor(0, 1);
+  lcd.print("  Parabens!!!");
+}
+
+/*
+  Interfaces no LCD que exibe mensagem de derrota
+  - visorDerrota(): Exibe "Voce PERDEU!" e "Tente Novamente"
+*/
+void visorDerrota(){
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("  Voce PERDEU!");
+  lcd.setCursor(0, 1);
+  lcd.print("Tente Novamente!");
 }
