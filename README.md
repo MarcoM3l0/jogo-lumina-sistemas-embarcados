@@ -37,8 +37,10 @@ O jogo Genius funciona da seguinte forma:
   - Simulação do circuito eletrônico
   - Escrita e testes do código
 - Componentes eletrônicos:
+  - Arduino UNO
   - LEDs
   - Botões
+  - LCD I2C
   - Resistores
   - Buzzer
 
