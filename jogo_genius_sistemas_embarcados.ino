@@ -268,7 +268,7 @@ void  jogoGenius(){
 
   // Se o jogador completou todas as 12 rodadas, ele venceu!
   // Exibe mensagem de vitória e toca melodia especial
-  if(rodada == 2){
+  if(rodada == 12){
     visorVitoria();    // Exibe mensagem de vitória no LCD
     venceuJogo();       // Toca melodia de vitória com show de luzes
     perdeuJogo = true;  // Usa a mesma flag de derrota para resetar o jogo
