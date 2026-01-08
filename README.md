@@ -55,7 +55,6 @@ O circuito foi montado no **Tinkercad**, conforme ilustrado abaixo:
 - 4 × LEDs (representando as cores do jogo)
 - 5 × Botões
 - 4 × Resistores para LEDs (220 Ω)
-- 1 x Resistores para os botões (10 kΩ)
 - 1 × Buzzer
 - Protoboard e jumpers
 
