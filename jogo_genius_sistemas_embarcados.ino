@@ -42,17 +42,17 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
     3 -> LED Verde
   Exemplo: {0, 2, 1, 2, ...} = Vermelho -> Azul -> Amarelo -> Azul -> ...
 */
-int sequencia[12] = {};
+uint8_t sequencia[12] = {};
 
 // Array com os pinos dos botões na mesma ordem dos LEDs
 // Facilita o acesso aos botões através de índices
 // Marcado como const para economizar RAM
-const int botoes[4] = {BTN_VERMELHO, BTN_AMARELO, BTN_AZUL, BTN_VERDE};
+const uint8_t botoes[4] = {BTN_VERMELHO, BTN_AMARELO, BTN_AZUL, BTN_VERDE};
 
 // Array com os pinos dos LEDs na mesma ordem
 // Permite acender qualquer LED usando: leds[numero]
 // Marcado como const para economizar RAM
-const int leds[4] = {LED_VERMELHO, LED_AMARELO, LED_AZUL, LED_VERDE};
+const uint8_t leds[4] = {LED_VERMELHO, LED_AMARELO, LED_AZUL, LED_VERDE};
 
 // Array com as frequências de som para cada LED
 // Cada LED toca uma nota musical diferente: RÉ, FÁ, MI, DÓ
@@ -65,17 +65,17 @@ const int tons[4] = {294, 349, 330, 262};
   - indica quantos passos já foram adicionados à sequência
   - Quando chega a 12, o jogador venceu o jogo
 */
-int rodada = 0;
+uint8_t rodada = 0;
 
 /*
   Contador de passos:
   - usado para verificar em qual posição da sequência o jogador está
   - Incrementado a cada acerto do jogador
 */
-int passo = 0;
+uint8_t passo = 0;
 
 // Armazena qual botão foi pressionado pelo jogador
-int botaoPressionado = 0;
+uint8_t botaoPressionado = 0;
 
 // Flag que indica se o jogador errou a sequência
 bool perdeuJogo = false;
@@ -133,7 +133,7 @@ int velocidade3 = 0; // Intervalo entre LEDs (será definido por aplicarDificuld
   O valor é alterado no menu de dificuldade através do botão BTN_MENU
   e aplicado pela função aplicarDificuldade() antes do jogo iniciar
 */
-int nivelDificuldade = 0; 
+uint8_t nivelDificuldade = 0; 
 
 /*
   Flag que controla se o menu de dificuldade está ativo
@@ -143,18 +143,12 @@ int nivelDificuldade = 0;
            Jogador pode navegar com BTN_MENU e confirmar com BTN_INICIAR
            Função menuDificuldade() está em execução
   - false: Menu fechado, jogo em andamento
-  
-  Ciclo de vida:
-  1. Inicia como true no setup()
-  2. Permanece true até jogador pressionar BTN_INICIAR
-  3. Muda para false quando jogo começa
-  4. Volta para true quando jogo termina (vitória ou derrota)
 */
 bool menuDificuldadeAtivo = true;
 ;
 
 // Máscara global dos leds para facilitar ligar/desligar todos os LEDs ao mesmo tempo
-const int ledsMascara = (1 << LED_VERMELHO) | (1 << LED_AMARELO) | (1 << LED_AZUL) | (1 << LED_VERDE);
+const uint8_t ledsMascara = (1 << LED_VERMELHO) | (1 << LED_AMARELO) | (1 << LED_AZUL) | (1 << LED_VERDE);
 
 void setup()
 { 
@@ -296,7 +290,7 @@ void proximaRodada(){
 void reproduzirSequencia(){
   
   // Loop que percorre toda a sequência acumulada até agora
-  for(int i = 0; i < rodada; i++){
+  for(uint8_t i = 0; i < rodada; i++){
     
     // Toca o som correspondente ao LED atual
     tone(BUZZER, tons[sequencia[i]], 250);
@@ -324,7 +318,7 @@ void reproduzirSequencia(){
 void esperarJogador(){
   
   // Loop que aguarda cada passo da sequência ser repetido
-  for (int i = 0; i < rodada; i++){
+  for (uint8_t i = 0; i < rodada; i++){
     bool jogou = false;
     
     // Fica em loop até o jogador apertar algum botão
@@ -355,7 +349,7 @@ void esperarJogador(){
 void limparJogo(){
 
   // Limpa toda a sequência armazenada
-  for(int i = 0; i < 12; i++){
+  for(uint8_t i = 0; i < 12; i++){
     sequencia[i] = 0;
   }
 
@@ -395,7 +389,7 @@ void limparJogo(){
 bool jogadaUsuario() {
 
   // Loop que verifica cada um dos 4 botões
-  for(int i = 0; i <= 3; i++){
+  for(uint8_t i = 0; i <= 3; i++){
 
     if(!(PINB & (1 << botoes[i]))){
       botaoPressionado = i; // Armazena qual botão foi pressionado
@@ -439,7 +433,7 @@ bool verificarJogada(int index) {
     visorDerrota(); // Exibe mensagem de derrota no LCD
 
     // Pisca todos os LEDs 3 vezes com som grave indicando erro
-    for(int i = 0; i < 3; i++){
+    for(uint8_t i = 0; i < 3; i++){
 
       tone(BUZZER, 70, 250);
 
@@ -488,7 +482,7 @@ void venceuJogo() {
   int melodiaPausa[] = {150, 300, 300, 100, 300, 550, 575};
  
   // Loop que percorre todas as 7 notas da melodia de vitória
-  for(int i = 0; i < 7; i++){
+  for(uint8_t i = 0; i < 7; i++){
 
     // Toca a nota atual com sua duração específica
     tone(BUZZER, melodia[i], melodiaDuracao[i]);
