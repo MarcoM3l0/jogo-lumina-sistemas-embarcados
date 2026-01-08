@@ -105,8 +105,14 @@ void setup()
   // &= ~(NOT) zera o bit, configurando como entrada
   DDRD &= ~(1 << BTN_INICIAR);
 
+  // Habilita resistor de pull-up interno para o botão iniciar
+  PORTD |= (1 << BTN_INICIAR); 
+
   // Configura botões de jogo (PB0, PB1, PB2, PB3) como entrada
   DDRB &= ~( (1 << BTN_VERMELHO) | (1 << BTN_AMARELO) | (1 << BTN_AZUL) | (1 << BTN_VERDE));
+
+  // Habilita resistores de pull-up internos para os botões de jogo
+  PORTB |= ( (1 << BTN_VERMELHO) | (1 << BTN_AMARELO) | (1 << BTN_AZUL) | (1 << BTN_VERDE)); 
   
   // Inicializa o gerador de números aleatórios usando ruído da porta analógica
   // Isso garante que cada jogo terá uma sequência diferente
@@ -119,12 +125,12 @@ void loop()
   if(jogoAtivo){
     // Se o jogo está ativo, executa a lógica principal do Genius
     jogoGenius();
-  }else if((PIND & (1 << BTN_INICIAR  )) && !jogoAtivo){
+  }else if(!(PIND & (1 << BTN_INICIAR  )) && !jogoAtivo){
     // Se o jogo NÃO está ativo E o botão iniciar foi pressionado:
 
     // Debounce: aguarda o jogador soltar o botão
     // Evita que um único pressionamento seja contado múltiplas vezes
-    while(PIND & (1 << BTN_INICIAR  )){
+    while(!(PIND & (1 << BTN_INICIAR  ))){
       delay(10);
     }
 
@@ -295,7 +301,7 @@ bool jogadaUsuario() {
   // Loop que verifica cada um dos 4 botões
   for(int i = 0; i <= 3; i++){
 
-    if(PINB & (1 << botoes[i])){
+    if(!(PINB & (1 << botoes[i]))){
       botaoPressionado = i; // Armazena qual botão foi pressionado
       
       // Feedback visual e sonoro ao jogador
@@ -310,7 +316,7 @@ bool jogadaUsuario() {
 
       // Debounce: aguarda o jogador soltar o botão
       // Evita que um único pressionamento seja contado múltiplas vezes
-      while(PINB & (1 << botoes[i])){
+      while(!(PINB & (1 << botoes[i]))){
         delay(10);
       }
 
@@ -376,18 +382,18 @@ void venceuJogo() {
   // ========== ARRAYS DA MELODIA DE VITÓRIA ==========
   // Array com as frequências das 14 primeiras notas do tema do Super Mario Bros
   // Versão reduzida para economizar memória RAM do Arduino
-  int melodia[] = {660, 660, 660, 510, 660, 770, 380, 510, 380, 320, 440, 480, 450, 430};
+  int melodia[] = {660, 660, 660, 510, 660, 770, 380};
 
   // Array com a duração de cada nota
   // Controla por quanto tempo cada nota será tocada
-  int melodiaDuracao[] = {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 80, 100, 100};
+  int melodiaDuracao[] = {100, 100, 100, 100, 100, 100, 100};
 
   // Array com a pausa após cada nota
   // Controla o intervalo entre as notas para criar o ritmo
-  int melodiaPausa[] = {150, 300, 300, 100, 300, 550, 575, 450, 400, 500, 300, 330, 150, 300};
+  int melodiaPausa[] = {150, 300, 300, 100, 300, 550, 575};
  
   // Loop que percorre todas as 14 notas da melodia de vitória
-  for(int i = 0; i < 14; i++){
+  for(int i = 0; i < 7; i++){
 
     // Toca a nota atual com sua duração específica
     tone(BUZZER, melodia[i], melodiaDuracao[i]);
