@@ -77,7 +77,15 @@ uint8_t passo = 0;
 // Armazena qual botão foi pressionado pelo jogador
 uint8_t botaoPressionado = 0;
 
-
+/*
+  Armazena a opção selecionada no menu principal
+  
+  Valores possíveis:
+  - 0 = JOGO (inicia o fluxo de seleção de dificuldade e partida)
+  - 1 = SONS (entra no modo de exploração de sons e LEDs)
+  
+  Alterado pelo BTN_MENU na função menuJogo()
+*/
 uint8_t opcaoMenu = 0;
 
 // Flag que indica se o jogador errou a sequência
@@ -93,13 +101,56 @@ bool perdeuJogo = false;
 */
 bool jogoAtivo = false;
 
+/*
+  Flag que controla se o menu principal está ativo
+  
+  Estados:
+  - true: Menu principal visível no LCD, aguardando seleção do jogador
+  - false: Menu fechado, outro modo está em execução (jogo, dificuldade ou sons)
+  
+  Resetado para true pela função limparJogo() ao fim de cada partida
+*/
 bool menuJogoAtivo = true;
 
+/*
+  Flag que controla se o modo de exploração de sons e LEDs está ativo
+  
+  Estados:
+  - true: Modo sons ativo — jogador pode pressionar os botões para
+          ouvir as notas e acender os LEDs correspondentes livremente
+  - false: Modo sons inativo
+  
+  Ativado no menuJogo() quando jogador seleciona a opção SONS
+  Desativado por limparJogo() ao pressionar BTN_MENU para voltar ao menu
+*/
 bool SonsLeds = false;
 
+/*
+  Flag de controle de atualização do LCD
+  
+  - false: A tela precisa ser redesenhada (estado mudou ou ainda não foi exibida)
+  - true: A tela já foi atualizada para o estado atual, evita redesenhos desnecessários
+  
+  Resetada para false sempre que o estado do sistema muda (via atualizarTela())
+  Definida como true dentro de cada função de exibição após o primeiro desenho
+*/
 bool telaAtualizada = false;
 
-uint8_t estadoAnterior = 255; // 0: Menu, 1: Dificuldade, 2: Jogo, 3: Sons
+/*
+  Armazena o estado de tela exibido anteriormente
+  Usado pela função atualizarTela() para detectar mudanças de estado e
+  forçar o redesenho do LCD apenas quando necessário
+  
+  Valores possíveis:
+  - 0: Menu principal
+  - 1: Menu de dificuldade
+  - 2: Jogo em andamento
+  - 3: Modo sons/LEDs
+  
+  Inicializado com 255 (valor inválido) para garantir que o primeiro
+  estado seja sempre desenhado ao ligar o sistema
+*/
+uint8_t estadoAnterior = 255;
 
 // ========== SISTEMA DE DIFICULDADE ==========
 /*
@@ -201,21 +252,34 @@ void setup()
 void loop()
 {
   /*
-    O jogo opera em dois estados principais:
+    O jogo opera em 4 estados mutuamente exclusivos,
+    controlados pelas flags jogoAtivo, menuDificuldadeAtivo,
+    SonsLeds e menuJogoAtivo:
     
-    ESTADO 1 - MENU DE DIFICULDADE (jogoAtivo = false):
-    - Exibe opções de dificuldade no LCD
-    - Aguarda seleção do jogador via BTN_MENU
-    - Aguarda confirmação via BTN_INICIAR
-    
-    ESTADO 2 - JOGO ATIVO (jogoAtivo = true):
+    ESTADO 1 - JOGO ATIVO (jogoAtivo = true):
     - Executa a lógica principal do Genius
     - Gerencia rodadas, sequências e validações
     - Detecta vitória ou derrota
     
+    ESTADO 2 - MENU DE DIFICULDADE (menuDificuldadeAtivo = true):
+    - Exibe opções de dificuldade no LCD
+    - Aguarda navegação via BTN_MENU
+    - Aguarda confirmação via BTN_INICIAR
+    
+    ESTADO 3 - MODO SONS (SonsLeds = true):
+    - Permite explorar sons e LEDs livremente
+    - BTN_MENU retorna ao menu principal
+    
+    ESTADO 4 - MENU PRINCIPAL (todos os outros false):
+    - Exibe opções JOGO e SONS no LCD
+    - Ponto de entrada após ligar o sistema ou encerrar partida
+    
     Transições:
-    - Menu → Jogo: quando BTN_INICIAR é pressionado no menu
-    - Jogo → Menu: quando jogo termina (vitória ou derrota)
+    - Menu Principal → Dificuldade: BTN_INICIAR com JOGO selecionado
+    - Menu Principal → Sons: BTN_INICIAR com SONS selecionado
+    - Dificuldade → Jogo: BTN_INICIAR confirma dificuldade
+    - Jogo → Menu Principal: partida encerrada (vitória ou derrota)
+    - Sons → Menu Principal: BTN_MENU pressionado em ouvirLeds()
   */
   if (jogoAtivo) {
     atualizarTela(2);
@@ -238,6 +302,19 @@ void loop()
 
 // ========== FUNÇÕES DO JOGO ==========
 
+/*
+  Monitora mudanças de estado do sistema e sinaliza quando o LCD precisa
+  ser redesenhado.
+  
+  Compara o estado atual com o anterior (estadoAnterior):
+  - Se forem diferentes: reseta telaAtualizada = false, forçando o redesenho
+    do LCD na próxima execução da função de exibição correspondente,
+    e atualiza estadoAnterior com o novo valor
+  - Se forem iguais: não faz nada, evitando redesenhos desnecessários
+  
+  Chamada no início de cada iteração do loop(), antes de executar
+  a função do estado ativo (menuJogo, menuDificuldade, ouvirLeds ou jogoGenius)
+*/
 void atualizarTela(uint8_t estadoAtual) {
   if (estadoAtual != estadoAnterior) {
     telaAtualizada = false; 
@@ -374,8 +451,8 @@ void esperarJogador(){
   Reseta todas as variáveis e limpa a sequência para começar um novo jogo
   - Zera todo o array de sequência
   - Reseta contadores de rodada e passo
-  - Desativa a flag de derrota
-  - Reativa o menu de dificuldade
+  - Desativa as flags
+  - Reativa o menu principal
   - Restaura velocidades padrão (serão redefinidas ao selecionar dificuldade)
 */
 void limparJogo(){
@@ -391,11 +468,17 @@ void limparJogo(){
     perdeuJogo = false;
 
     /*
-      Após o jogo terminar (vitória ou derrota):
-      1. jogoAtivo = false → sai do modo de jogo
-      2. menuDificuldadeAtivo = true → reativa o menu de seleção
+      Após o jogo terminar (vitória ou derrota), todas as flags de estado
+      são resetadas para retornar ao menu principal:
       
-      Isso permite ao jogador escolher nova dificuldade antes de jogar novamente
+      1. jogoAtivo = false         → sai do modo de jogo
+      2. menuDificuldadeAtivo = false → garante que o menu de dificuldade não abra sozinho
+      3. SonsLeds = false          → garante que o modo sons não abra sozinho
+      4. telaAtualizada = false    → força o redesenho do LCD ao entrar no menu principal
+      5. menuJogoAtivo = true      → reativa o menu principal
+      
+      Na próxima iteração do loop(), o else final será executado,
+      chamando menuJogo() e exibindo o menu principal
     */
     jogoAtivo = false;
     menuDificuldadeAtivo = false;
@@ -403,7 +486,7 @@ void limparJogo(){
     telaAtualizada = false;
     menuJogoAtivo = true;
 
-    lcd.clear();
+    lcd.clear(); // Limpar o LCD
 
     /*
       Reseta os valores de velocidade (serão sobrescritos por aplicarDificuldade()
@@ -607,6 +690,22 @@ void aplicarDificuldade(){
   }
 }
 
+/*
+  Menu principal do sistema, exibido ao ligar o Arduino ou após encerrar uma partida
+  
+  FUNCIONALIDADE:
+  - Exibe duas opções navegáveis no LCD: JOGO e SONS
+  - O indicador "> " aponta para a opção selecionada no momento
+  - BTN_MENU: alterna a seleção entre JOGO e SONS (comportamento toggle)
+  - BTN_INICIAR: confirma a opção selecionada e redireciona para o modo correspondente
+  
+  Transições possíveis:
+  - JOGO selecionado → ativa menuDificuldadeAtivo = true → exibe menuDificuldade()
+  - SONS selecionado → ativa SonsLeds = true → exibe ouvirLeds()
+  
+  Utiliza variável estática ultimaOpcao para redesenhar o LCD apenas quando
+  a seleção muda, evitando flickering desnecessário no display
+*/
 void menuJogo() {
   
   static uint8_t ultimaOpcao = 255; 
@@ -745,8 +844,26 @@ void menuDificuldade(){
   }
 }
 
+/*
+  Modo de exploração livre de sons e LEDs
+  
+  FUNCIONALIDADE:
+  - Permite ao jogador pressionar qualquer um dos 4 botões de cor
+    para acender o LED correspondente e ouvir sua nota musical
+  - Útil para aprender a associação entre cores, botões e sons
+    antes de iniciar uma partida
+  - BTN_MENU: encerra o modo e retorna ao menu principal via limparJogo()
+
+  FLUXO:
+  1. Na primeira execução, exibe instruções no LCD via visorSonsLeds()
+  2. Varre os 4 botões de cor continuamente
+  3. Ao detectar pressionamento: acende LED, toca nota, aguarda soltar (debounce)
+  4. Verifica BTN_MENU a cada ciclo — se pressionado, chama limparJogo()
+     para resetar os estados e voltar ao menu principal
+*/
 void ouvirLeds(){
 
+  // Exibe instruções no LCD apenas na primeira vez que entra no modo
   if(!telaAtualizada){
     visorSonsLeds();
     telaAtualizada = true;
@@ -781,6 +898,7 @@ void ouvirLeds(){
         delay(10);
       }
 
+      // Reseta todos os estados e retorna ao menu principal
       limparJogo();
     }
   }
@@ -822,6 +940,14 @@ void visorDerrota(){
   lcd.print("Tente Novamente!");
 }
 
+/*
+  Interface no LCD que exibe as instruções do modo de exploração de sons
+  - Linha 1: instrução para voltar ao menu ("PARA VOLTAR!")
+  - Linha 2: instrução do botão a pressionar ("APERTE BTN MENU!")
+  
+  Exibida apenas uma vez ao entrar no modo ouvirLeds(),
+  controlada pela flag telaAtualizada
+*/
 void visorSonsLeds() {
   lcd.clear();
   lcd.setCursor(0, 0);
