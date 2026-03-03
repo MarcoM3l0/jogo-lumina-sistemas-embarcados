@@ -1,7 +1,14 @@
 /*
-	LiquidCrystal_I2C: 
-    Biblioteca para controlar displays LCD via protocolo I2C
-*/ 
+  =====================================================
+  LUMINA - Jogo de Memória com Luzes e Sons
+  Desenvolvido para sistemas embarcados com Arduino
+  =====================================================
+*/
+
+/*
+  LiquidCrystal_I2C:
+  Biblioteca para controlar displays LCD via protocolo I2C
+*/
 #include <LiquidCrystal_I2C.h>
 
 // Inicialização do objeto LCD com comunicação I2C
@@ -239,7 +246,7 @@ void loop()
     modoLivreAtivo e menuJogo:
     
     ESTADO 1 - JOGO ATIVO (jogoAtivo = true):
-    - Executa a lógica principal do Genius
+    - Executa a lógica principal do Lumina
     - Gerencia rodadas, sequências e validações
     - Detecta vitória ou derrota
     
@@ -265,7 +272,7 @@ void loop()
   */
   if (jogoAtivo) {
     atualizarTela(2);
-    jogoGenius();
+    jogoLumina();
   } 
   else if (menuDificuldadeAtivo) {
     atualizarTela(1);
@@ -295,7 +302,7 @@ void loop()
   - Se forem iguais: não faz nada, evitando redesenhos desnecessários
   
   Chamada no início de cada iteração do loop(), antes de executar
-  a função do estado ativo (menuJogo, menuDificuldade, modoLivre ou jogoGenius)
+  a função do estado ativo (menuJogo, menuDificuldade, modoLivre ou jogoLumina)
 */
 void atualizarTela(uint8_t estadoAtual) {
   if (estadoAtual != estadoAnterior) {
@@ -305,7 +312,7 @@ void atualizarTela(uint8_t estadoAtual) {
 }
 
 /*
-  Lógica principal do Jogo Genius.
+  Lógica principal do Jogo Lumina.
   Gerencia todo o fluxo de uma partida do jogo:
   - Adiciona novos passos à sequência
   - Reproduz a sequência para o jogador
@@ -315,7 +322,7 @@ void atualizarTela(uint8_t estadoAtual) {
   
   Esta função só é executada quando jogoAtivo == true
 */
-void  jogoGenius(){
+void jogoLumina(){
 
   // Verifica se o jogador perdeu o jogo ou completou todas as rodadas
   if(perdeuJogo == true){
@@ -565,13 +572,13 @@ void venceuJogo() {
 
   // ========== ARRAYS DA MELODIA DE VITÓRIA ==========
   // Array com as frequências das notas
-  int melodia[] = {523, 659, 784, 1047, 784, 1047, 1319, 1047, 784, 659, 523, 392, 523};
+  int melodia[] = {440, 494, 523, 587, 659, 587, 523, 659, 784, 659, 784, 880, 1047};
 
   // Array com a duração de cada uma das 13 notas
-  int melodiaDuracao[] = {150, 150, 150, 300, 150, 300, 400, 150, 150, 150, 300, 200,500};
+  int melodiaDuracao[] = {120, 120, 120, 120, 240, 120, 120, 180, 180, 120, 180, 240, 480};
 
-  // Array com a pausa de cada uma das 13 notas
-  int melodiaPausa[] = {195, 195, 195, 390, 195, 390, 520, 195, 195, 195, 390, 260, 650};
+  // Array com a pausa após cada uma das 13 notas
+  int melodiaPausa[] = {156, 156, 156, 156, 312, 156, 156, 234, 234, 156, 234, 312, 624};
  
   // Loop que percorre todas as 13 notas da melodia de vitória
   for(uint8_t i = 0; i < sizeof(melodia)/sizeof(melodia[0]); i++){
@@ -802,7 +809,7 @@ void menuDificuldade(){
       animacaoInicio();
 
       // Muda o estado para jogoAtivo = true
-      // Na próxima iteração do loop(), jogoGenius() será executado
+      // Na próxima iteração do loop(), jogoLumina() será executado
       jogoAtivo = true;
     }
 
@@ -890,7 +897,7 @@ void visorRodadas(){
 void visorVitoria(){
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("  Voce VENCEU!");
+  lcd.print(" Voce VENCEU!");
   lcd.setCursor(0, 1);
   lcd.print("  Parabens!!!");
 }
