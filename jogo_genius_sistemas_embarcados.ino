@@ -461,8 +461,8 @@ bool verificarJogada(int index) {
 /*
   Função chamada quando o jogador completa todas as 12 rodadas
   
-  Reproduz uma versão abreviada do tema de Super Mario Bros com show de luzes:
-  - melodia[]: frequências das 7 primeiras notas
+  Reproduz um tema de vitória com show de luzes:
+  - melodia[]: frequências das 13 notas
   - melodiaDuracao[]: duração de cada nota
   - melodiaPausa[]: pausa após cada nota
   
@@ -471,15 +471,14 @@ bool verificarJogada(int index) {
 void venceuJogo() {
 
   // ========== ARRAYS DA MELODIA DE VITÓRIA ==========
-  // Array com as frequências das 7 primeiras notas do tema do Super Mario Bros
-  // Versão reduzida para economizar memória RAM do Arduino
-  int melodia[] = {660, 660, 660, 510, 660, 770, 380};
+  // Array com as frequências das notas
+  int melodia[] = {523, 659, 784, 1047, 784, 1047, 1319, 1047, 784, 659, 523, 392, 523};
 
   // Array com a duração de cada uma das 7 notas
-  int melodiaDuracao[] = {100, 100, 100, 100, 100, 100, 100};
+  int melodiaDuracao[] = {150, 150, 150, 300, 150, 300, 400, 150, 150, 150, 300, 200,500};
 
   // Array com a pausa de cada uma das 7 notas
-  int melodiaPausa[] = {150, 300, 300, 100, 300, 550, 575};
+  int melodiaPausa[] = {195, 195, 195, 390, 195, 390, 520, 195, 195, 195, 390, 260, 650};
  
   // Loop que percorre todas as 7 notas da melodia de vitória
   for(uint8_t i = 0; i < 7; i++){
