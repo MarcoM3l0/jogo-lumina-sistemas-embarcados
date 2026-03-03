@@ -55,9 +55,9 @@ const uint8_t botoes[4] = {BTN_VERMELHO, BTN_AMARELO, BTN_AZUL, BTN_VERDE};
 const uint8_t leds[4] = {LED_VERMELHO, LED_AMARELO, LED_AZUL, LED_VERDE};
 
 // Array com as frequências de som para cada LED
-// Cada LED toca uma nota musical diferente: RÉ, FÁ, MI, DÓ
+// Cada LED toca uma nota musical diferente: LÁ3, DÓ5, SOL5 e MI6
 // Marcado como const para economizar RAM
-const int tons[4] = {294, 349, 330, 262};
+const int tons[4] = {220, 523, 784, 1319};
 
 // ========== VARIÁVEIS DE CONTROLE DO JOGO ==========
 /*
