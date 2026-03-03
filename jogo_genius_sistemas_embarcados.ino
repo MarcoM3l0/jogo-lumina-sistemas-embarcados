@@ -82,7 +82,7 @@ uint8_t botaoPressionado = 0;
   
   Valores possíveis:
   - 0 = JOGO (inicia o fluxo de seleção de dificuldade e partida)
-  - 1 = SONS (entra no modo de exploração de sons e LEDs)
+  - 1 = LIVRE (entra no modo de exploração de sons e LEDs)
   
   Alterado pelo BTN_MENU na função menuJogo()
 */
@@ -106,7 +106,7 @@ bool jogoAtivo = false;
   
   Estados:
   - true: Menu principal visível no LCD, aguardando seleção do jogador
-  - false: Menu fechado, outro modo está em execução (jogo, dificuldade ou sons)
+  - false: Menu fechado, outro modo está em execução (jogo, dificuldade ou livre)
   
   Resetado para true pela função limparJogo() ao fim de cada partida
 */
@@ -116,14 +116,14 @@ bool menuJogoAtivo = true;
   Flag que controla se o modo de exploração de sons e LEDs está ativo
   
   Estados:
-  - true: Modo sons ativo — jogador pode pressionar os botões para
+  - true: Modo livre ativo — jogador pode pressionar os botões para
           ouvir as notas e acender os LEDs correspondentes livremente
-  - false: Modo sons inativo
+  - false: Modo livre inativo
   
-  Ativado no menuJogo() quando jogador seleciona a opção SONS
+  Ativado no menuJogo() quando jogador seleciona a opção LIVRE
   Desativado por limparJogo() ao pressionar BTN_MENU para voltar ao menu
 */
-bool SonsLeds = false;
+bool modoLivreAtivo = false;
 
 /*
   Flag de controle de atualização do LCD
@@ -145,7 +145,7 @@ bool telaAtualizada = false;
   - 0: Menu principal
   - 1: Menu de dificuldade
   - 2: Jogo em andamento
-  - 3: Modo sons/LEDs
+  - 3: Modo livre
   
   Inicializado com 255 (valor inválido) para garantir que o primeiro
   estado seja sempre desenhado ao ligar o sistema
@@ -254,7 +254,7 @@ void loop()
   /*
     O jogo opera em 4 estados mutuamente exclusivos,
     controlados pelas flags jogoAtivo, menuDificuldadeAtivo,
-    SonsLeds e menuJogoAtivo:
+    modoLivreAtivo e menuJogoAtivo:
     
     ESTADO 1 - JOGO ATIVO (jogoAtivo = true):
     - Executa a lógica principal do Genius
@@ -266,20 +266,20 @@ void loop()
     - Aguarda navegação via BTN_MENU
     - Aguarda confirmação via BTN_INICIAR
     
-    ESTADO 3 - MODO SONS (SonsLeds = true):
+    ESTADO 3 - MODO LIVRE (modoLivreAtivo = true):
     - Permite explorar sons e LEDs livremente
     - BTN_MENU retorna ao menu principal
     
     ESTADO 4 - MENU PRINCIPAL (todos os outros false):
-    - Exibe opções JOGO e SONS no LCD
+    - Exibe opções JOGO e LIVRE no LCD
     - Ponto de entrada após ligar o sistema ou encerrar partida
     
     Transições:
     - Menu Principal → Dificuldade: BTN_INICIAR com JOGO selecionado
-    - Menu Principal → Sons: BTN_INICIAR com SONS selecionado
+    - Menu Principal → Livre: BTN_INICIAR com LIVRE selecionado
     - Dificuldade → Jogo: BTN_INICIAR confirma dificuldade
     - Jogo → Menu Principal: partida encerrada (vitória ou derrota)
-    - Sons → Menu Principal: BTN_MENU pressionado em ouvirLeds()
+    - Livre → Menu Principal: BTN_MENU pressionado em ouvirLeds()
   */
   if (jogoAtivo) {
     atualizarTela(2);
@@ -289,7 +289,7 @@ void loop()
     atualizarTela(1);
     menuDificuldade();
   } 
-  else if (SonsLeds) {
+  else if (modoLivreAtivo) {
     atualizarTela(3);
     ouvirLeds();
   } 
@@ -473,7 +473,7 @@ void limparJogo(){
       
       1. jogoAtivo = false         → sai do modo de jogo
       2. menuDificuldadeAtivo = false → garante que o menu de dificuldade não abra sozinho
-      3. SonsLeds = false          → garante que o modo sons não abra sozinho
+      3. modoLivreAtivo = false          → garante que o modo livre não abra sozinho
       4. telaAtualizada = false    → força o redesenho do LCD ao entrar no menu principal
       5. menuJogoAtivo = true      → reativa o menu principal
       
@@ -482,7 +482,7 @@ void limparJogo(){
     */
     jogoAtivo = false;
     menuDificuldadeAtivo = false;
-    SonsLeds = false;
+    modoLivreAtivo = false;
     telaAtualizada = false;
     menuJogoAtivo = true;
 
@@ -694,14 +694,14 @@ void aplicarDificuldade(){
   Menu principal do sistema, exibido ao ligar o Arduino ou após encerrar uma partida
   
   FUNCIONALIDADE:
-  - Exibe duas opções navegáveis no LCD: JOGO e SONS
+  - Exibe duas opções navegáveis no LCD: JOGO e LIVRE
   - O indicador "> " aponta para a opção selecionada no momento
-  - BTN_MENU: alterna a seleção entre JOGO e SONS (comportamento toggle)
+  - BTN_MENU: alterna a seleção entre JOGO e LIVRE (comportamento toggle)
   - BTN_INICIAR: confirma a opção selecionada e redireciona para o modo correspondente
   
   Transições possíveis:
   - JOGO selecionado → ativa menuDificuldadeAtivo = true → exibe menuDificuldade()
-  - SONS selecionado → ativa SonsLeds = true → exibe ouvirLeds()
+  - LIVRE selecionado → ativa modoLivreAtivo = true → exibe ouvirLeds()
   
   Utiliza variável estática ultimaOpcao para redesenhar o LCD apenas quando
   a seleção muda, evitando flickering desnecessário no display
@@ -713,10 +713,10 @@ void menuJogo() {
   if (opcaoMenu != ultimaOpcao) {
     if (opcaoMenu == 0) {
       lcd.setCursor(0, 0); lcd.print("> JOGO");
-      lcd.setCursor(0, 1); lcd.print("  SONS");
+      lcd.setCursor(0, 1); lcd.print("  LIVRE");
     } else {
       lcd.setCursor(0, 0); lcd.print("  JOGO");
-      lcd.setCursor(0, 1); lcd.print("> SONS");
+      lcd.setCursor(0, 1); lcd.print("> LIVRE");
     }
     ultimaOpcao = opcaoMenu;
   }
@@ -740,7 +740,7 @@ void menuJogo() {
       menuDificuldadeAtivo = true;
       menuJogoAtivo = false;
     } else {
-      SonsLeds = true;
+      modoLivreAtivo = true;
       menuJogoAtivo = false;
     }
   }
@@ -851,7 +851,7 @@ void menuDificuldade(){
   - BTN_MENU: encerra o modo e retorna ao menu principal via limparJogo()
 
   FLUXO:
-  1. Na primeira execução, exibe instruções no LCD via visorSonsLeds()
+  1. Na primeira execução, exibe instruções no LCD via visorModoLivre()
   2. Varre os 4 botões de cor continuamente
   3. Ao detectar pressionamento: acende LED, toca nota, aguarda soltar (debounce)
   4. Verifica BTN_MENU a cada ciclo — se pressionado, chama limparJogo()
@@ -861,7 +861,7 @@ void ouvirLeds(){
 
   // Exibe instruções no LCD apenas na primeira vez que entra no modo
   if(!telaAtualizada){
-    visorSonsLeds();
+    visormodoLivre();
     telaAtualizada = true;
   }
 
@@ -937,14 +937,14 @@ void visorDerrota(){
 }
 
 /*
-  Interface no LCD que exibe as instruções do modo de exploração de sons
+  Interface no LCD que exibe as instruções do modo livre
   - Linha 1: instrução para voltar ao menu ("PARA VOLTAR!")
   - Linha 2: instrução do botão a pressionar ("APERTE BTN MENU!")
   
   Exibida apenas uma vez ao entrar no modo ouvirLeds(),
   controlada pela flag telaAtualizada
 */
-void visorSonsLeds() {
+void visorModoLivre() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("  PARA VOLTAR!");
