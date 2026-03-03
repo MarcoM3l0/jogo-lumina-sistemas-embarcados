@@ -77,6 +77,9 @@ uint8_t passo = 0;
 // Armazena qual botão foi pressionado pelo jogador
 uint8_t botaoPressionado = 0;
 
+
+uint8_t opcaoMenu = 0;
+
 // Flag que indica se o jogador errou a sequência
 bool perdeuJogo = false;
 
@@ -89,6 +92,12 @@ bool perdeuJogo = false;
   até que o jogador pressione o botão de iniciar
 */
 bool jogoAtivo = false;
+
+bool menuJogoAtivo = true;
+
+bool SonsLeds = false;
+
+bool telaAtualizada = false;
 
 // ========== SISTEMA DE DIFICULDADE ==========
 /*
@@ -135,6 +144,7 @@ int velocidade3 = 0; // Intervalo entre LEDs (será definido por aplicarDificuld
 */
 uint8_t nivelDificuldade = 0; 
 
+
 /*
   Flag que controla se o menu de dificuldade está ativo
   
@@ -144,8 +154,7 @@ uint8_t nivelDificuldade = 0;
            Função menuDificuldade() está em execução
   - false: Menu fechado, jogo em andamento
 */
-bool menuDificuldadeAtivo = true;
-;
+bool menuDificuldadeAtivo = false;
 
 // Máscara global dos leds para facilitar ligar/desligar todos os LEDs ao mesmo tempo
 const uint8_t ledsMascara = (1 << LED_VERMELHO) | (1 << LED_AMARELO) | (1 << LED_AZUL) | (1 << LED_VERDE);
@@ -207,7 +216,9 @@ void loop()
     - Jogo → Menu: quando jogo termina (vitória ou derrota)
   */
   if(jogoAtivo) jogoGenius();
-  else menuDificuldade();
+  else if (menuDificuldadeAtivo) menuDificuldade();
+  else if (SonsLeds) ouvirLeds();
+  else menuJogo();
 }
 
 
@@ -366,7 +377,12 @@ void limparJogo(){
       Isso permite ao jogador escolher nova dificuldade antes de jogar novamente
     */
     jogoAtivo = false;
-    menuDificuldadeAtivo = true;
+    menuDificuldadeAtivo = false;
+    SonsLeds = false;
+    telaAtualizada = false;
+    menuJogoAtivo = true;
+
+    lcd.clear();
 
     /*
       Reseta os valores de velocidade (serão sobrescritos por aplicarDificuldade()
@@ -481,7 +497,7 @@ void venceuJogo() {
   int melodiaPausa[] = {195, 195, 195, 390, 195, 390, 520, 195, 195, 195, 390, 260, 650};
  
   // Loop que percorre todas as 7 notas da melodia de vitória
-  for(uint8_t i = 0; i < 7; i++){
+  for(uint8_t i = 0; i < sizeof(melodia)/sizeof(melodia[0]); i++){
 
     // Toca a nota atual com sua duração específica
     tone(BUZZER, melodia[i], melodiaDuracao[i]);
@@ -567,6 +583,52 @@ void aplicarDificuldade(){
       velocidade2 = 200;
       velocidade3 = 150;
       break;
+  }
+}
+
+void menuJogo(){
+  
+  while(menuJogoAtivo){
+
+    if (opcaoMenu == 0){
+      lcd.setCursor(0, 0);
+      lcd.print("> JOGO");
+      lcd.setCursor(0, 1);
+      lcd.print("  SONS");
+    } else {
+      lcd.setCursor(0, 0);
+      lcd.print("  JOGO");
+      lcd.setCursor(0, 1);
+      lcd.print("> SONS");
+    }
+
+    // Verifica se o botão de menu foi pressionado
+    if(!(PINB & (1 << BTN_MENU ))){
+
+      // Debounce - aguarda o botão ser solto
+      while(!(PINB & (1 << BTN_MENU ))){
+        delay(10);
+      }
+
+      opcaoMenu = !opcaoMenu;
+    }
+
+    // Quando BTN_INICIAR é pressionado, ele...
+    if(!(PIND & (1 << BTN_INICIAR  ))){
+
+      // Debounce - aguarda o botão ser solto
+      while(!(PIND & (1 << BTN_INICIAR  ))){
+        delay(10);
+      }
+
+      if (opcaoMenu == 0){
+        menuDificuldadeAtivo = true;
+        menuJogoAtivo = false;
+      } else {
+        SonsLeds = true;
+        menuJogoAtivo = false;
+      }
+    }
   }
 }
 
@@ -662,6 +724,42 @@ void menuDificuldade(){
   }
 }
 
+void ouvirLeds(){
+
+  if(!telaAtualizada){
+    visorSonsLeds();
+    telaAtualizada = true;
+  }
+
+  for(uint8_t i = 0; i <= 3; i++){
+
+    if(!(PINB & (1 << botoes[i]))){
+      botaoPressionado = i; // Armazena qual botão foi pressionado
+      
+      // Feedback visual e sonoro ao jogador
+      tone(BUZZER, tons[i], 250);
+      PORTD |= (1 << leds[botaoPressionado]); // Liga o led
+        
+      delay(300);
+      
+      // Apaga o LED e para o som
+      PORTD &= ~(1 << leds[botaoPressionado]); // Desliga o led
+      noTone(BUZZER);
+
+      // Debounce: aguarda o jogador soltar o botão
+      // Evita que um único pressionamento seja contado múltiplas vezes
+      while(!(PINB & (1 << botoes[i]))){
+        delay(10);
+      }
+    }
+
+    // Verifica se o botão de menu foi pressionado
+    if(!(PINB & (1 << BTN_MENU ))){
+      limparJogo();
+    }
+  }
+}
+
 /*
   Interface no LCD que exibe a rodada atual do jogo
   - Atualiza a linha 2 do LCD com o texto "Rodada: X"
@@ -696,4 +794,12 @@ void visorDerrota(){
   lcd.print("  Voce PERDEU!");
   lcd.setCursor(0, 1);
   lcd.print("Tente Novamente!");
+}
+
+void visorSonsLeds() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("  PARA VOLTAR!");
+  lcd.setCursor(0, 1);
+  lcd.print("APERTE MENU!");
 }
