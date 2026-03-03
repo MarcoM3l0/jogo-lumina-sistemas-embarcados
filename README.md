@@ -52,7 +52,7 @@ O jogo da memória funciona da seguinte forma:
 
 O circuito foi montado no **Tinkercad**, conforme ilustrado abaixo:
 
-![Esquema do circuito no Tinkercad](https://github.com/MarcoM3l0/jogo-lumina-sistemas-embarcados/blob/main/jogo-genius-sistemas-embarcados.png)
+![Esquema do circuito no Tinkercad](https://github.com/MarcoM3l0/jogo-lumina-sistemas-embarcados/blob/main/jogo-lumina-sistemas-embarcados.png)
 
 ### Componentes Utilizados
 
