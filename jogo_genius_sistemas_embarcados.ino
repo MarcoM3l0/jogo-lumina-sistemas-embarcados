@@ -586,48 +586,42 @@ void aplicarDificuldade(){
   }
 }
 
-void menuJogo(){
+void menuJogo() {
   
-  while(menuJogoAtivo){
+  static uint8_t ultimaOpcao = 255; 
 
-    if (opcaoMenu == 0){
-      lcd.setCursor(0, 0);
-      lcd.print("> JOGO");
-      lcd.setCursor(0, 1);
-      lcd.print("  SONS");
+  if (opcaoMenu != ultimaOpcao) {
+    if (opcaoMenu == 0) {
+      lcd.setCursor(0, 0); lcd.print("> JOGO");
+      lcd.setCursor(0, 1); lcd.print("  SONS");
     } else {
-      lcd.setCursor(0, 0);
-      lcd.print("  JOGO");
-      lcd.setCursor(0, 1);
-      lcd.print("> SONS");
+      lcd.setCursor(0, 0); lcd.print("  JOGO");
+      lcd.setCursor(0, 1); lcd.print("> SONS");
     }
+    ultimaOpcao = opcaoMenu;
+  }
 
-    // Verifica se o botão de menu foi pressionado
-    if(!(PINB & (1 << BTN_MENU ))){
+  // Navegação no Menu
+  if (!(PINB & (1 << BTN_MENU))) {
+    while (!(PINB & (1 << BTN_MENU))) { delay(10); }
+    opcaoMenu = !opcaoMenu;
+  }
 
-      // Debounce - aguarda o botão ser solto
-      while(!(PINB & (1 << BTN_MENU ))){
-        delay(10);
-      }
+  // Confirmação
+  if (!(PIND & (1 << BTN_INICIAR))) {
+    while (!(PIND & (1 << BTN_INICIAR))) { delay(10); }
+    
+    // Antes de mudar de estado, resetamos a sinalização
+    ultimaOpcao = 255; 
+    telaAtualizada = false;
+    lcd.clear(); // Limpa o menu para entrar no próximo modo
 
-      opcaoMenu = !opcaoMenu;
-    }
-
-    // Quando BTN_INICIAR é pressionado, ele...
-    if(!(PIND & (1 << BTN_INICIAR  ))){
-
-      // Debounce - aguarda o botão ser solto
-      while(!(PIND & (1 << BTN_INICIAR  ))){
-        delay(10);
-      }
-
-      if (opcaoMenu == 0){
-        menuDificuldadeAtivo = true;
-        menuJogoAtivo = false;
-      } else {
-        SonsLeds = true;
-        menuJogoAtivo = false;
-      }
+    if (opcaoMenu == 0) {
+      menuDificuldadeAtivo = true;
+      menuJogoAtivo = false;
+    } else {
+      SonsLeds = true;
+      menuJogoAtivo = false;
     }
   }
 }
@@ -747,7 +741,6 @@ void ouvirLeds(){
       noTone(BUZZER);
 
       // Debounce: aguarda o jogador soltar o botão
-      // Evita que um único pressionamento seja contado múltiplas vezes
       while(!(PINB & (1 << botoes[i]))){
         delay(10);
       }
@@ -755,6 +748,12 @@ void ouvirLeds(){
 
     // Verifica se o botão de menu foi pressionado
     if(!(PINB & (1 << BTN_MENU ))){
+
+      // Debounce: aguarda o jogador soltar o botão
+      while(!(PINB & (1 << botoes[i]))){
+        delay(10);
+      }
+
       limparJogo();
     }
   }
@@ -801,5 +800,5 @@ void visorSonsLeds() {
   lcd.setCursor(0, 0);
   lcd.print("  PARA VOLTAR!");
   lcd.setCursor(0, 1);
-  lcd.print("APERTE MENU!");
+  lcd.print("APERTE BTN MENU!");
 }
