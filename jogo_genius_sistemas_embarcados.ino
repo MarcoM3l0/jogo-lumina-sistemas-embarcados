@@ -757,20 +757,16 @@ void menuJogo() {
 */
 void menuDificuldade(){
 
+  //Inicializa o display do menu de dificuldade
   if (!telaAtualizada) {
-    lcd.setCursor(0, 0);
-    lcd.print("Dificuldade:");
-    telaAtualizada = true;
+    lcd.clear();
+    lcd.setCursor(0, 0);       // Move o cursor para a linha 1, coluna 0
+    lcd.print(F("Dificuldade:")); // Exibe título na linha 1
   }
   
   // Array constante com os textos de cada nível de dificuldade
   const char* niveis[3] = {"FACIL", "MEDIO", "DIFICIL"};
-
-  //Inicializa o display do menu de dificuldade
-  lcd.clear();               // Limpa o display 
-  lcd.setCursor(0, 0);       // Move o cursor para a linha 1, coluna 0
-  lcd.print("Dificuldade:"); // Exibe título na linha 1
-
+  
   /*
     Este loop continua executando enquanto menuDificuldadeAtivo for true
 
@@ -894,7 +890,7 @@ void ouvirLeds(){
     if(!(PINB & (1 << BTN_MENU ))){
 
       // Debounce: aguarda o jogador soltar o botão
-      while(!(PINB & (1 << botoes[i]))){
+      while(!(PINB & (1 << BTN_MENU))){
         delay(10);
       }
 
