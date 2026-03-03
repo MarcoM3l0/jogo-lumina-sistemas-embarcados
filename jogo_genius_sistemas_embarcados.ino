@@ -67,13 +67,6 @@ const int tons[4] = {220, 523, 784, 1319};
 */
 uint8_t rodada = 0;
 
-/*
-  Contador de passos:
-  - usado para verificar em qual posição da sequência o jogador está
-  - Incrementado a cada acerto do jogador
-*/
-uint8_t passo = 0;
-
 // Armazena qual botão foi pressionado pelo jogador
 uint8_t botaoPressionado = 0;
 
@@ -100,17 +93,6 @@ bool perdeuJogo = false;
   até que o jogador pressione o botão de iniciar
 */
 bool jogoAtivo = false;
-
-/*
-  Flag que controla se o menu principal está ativo
-  
-  Estados:
-  - true: Menu principal visível no LCD, aguardando seleção do jogador
-  - false: Menu fechado, outro modo está em execução (jogo, dificuldade ou livre)
-  
-  Resetado para true pela função limparJogo() ao fim de cada partida
-*/
-bool menuJogoAtivo = true;
 
 /*
   Flag que controla se o modo de exploração de sons e LEDs está ativo
@@ -160,19 +142,19 @@ uint8_t estadoAnterior = 255;
   conforme o nível selecionado pelo jogador:
   
   FÁCIL (nivelDificuldade = 0):
-  - velocidade1: 1500ms (1.5s entre rodadas - mais tempo para pensar)
-  - velocidade2: 400ms (LEDs ficam acesos mais tempo - mais fácil de ver)
-  - velocidade3: 250ms (mais intervalo entre LEDs - sequência mais clara)
+  - delayEntreRodadas: 1500ms (1.5s entre rodadas - mais tempo para pensar)
+  - duracaoLedSequencia: 400ms (LEDs ficam acesos mais tempo - mais fácil de ver)
+  - intervaloEntreLeds: 250ms (mais intervalo entre LEDs - sequência mais clara)
   
   MÉDIO (nivelDificuldade = 1):
-  - velocidade1: 1000ms (1s entre rodadas - tempo padrão)
-  - velocidade2: 300ms (LEDs acesos tempo padrão)
-  - velocidade3: 200ms (intervalo padrão entre LEDs)
+  - delayEntreRodadas: 1000ms (1s entre rodadas - tempo padrão)
+  - duracaoLedSequencia: 300ms (LEDs acesos tempo padrão)
+  - intervaloEntreLeds: 200ms (intervalo padrão entre LEDs)
   
   DIFÍCIL (nivelDificuldade = 2):
-  - velocidade1: 700ms (0.7s entre rodadas - pouco tempo para pensar)
-  - velocidade2: 200ms (LEDs acesos rapidamente - difícil de acompanhar)
-  - velocidade3: 150ms (pouco intervalo - sequência muito rápida)
+  - delayEntreRodadas: 700ms (0.7s entre rodadas - pouco tempo para pensar)
+  - duracaoLedSequencia: 200ms (LEDs acesos rapidamente - difícil de acompanhar)
+  - intervaloEntreLeds: 150ms (pouco intervalo - sequência muito rápida)
   
   Quanto menores os valores, mais rápido e difícil fica o jogo
   
@@ -180,9 +162,9 @@ uint8_t estadoAnterior = 255;
   Na rodada 7, as velocidades são reduzidas em 20% automaticamente,
   aumentando ainda mais a dificuldade independente do nível inicial
 */
-int velocidade1 = 0; // Delay entre rodadas (será definido por aplicarDificuldade())
-int velocidade2 = 0; // LED aceso na sequência (será definido por aplicarDificuldade())
-int velocidade3 = 0; // Intervalo entre LEDs (será definido por aplicarDificuldade())
+int delayEntreRodadas   = 0; // Delay entre rodadas (será definido por aplicarDificuldade())
+int duracaoLedSequencia  = 0; // LED aceso na sequência (será definido por aplicarDificuldade())
+int intervaloEntreLeds = 0; // Intervalo entre LEDs (será definido por aplicarDificuldade())
 
 /*
   Armazena o nível de dificuldade selecionado pelo jogador
@@ -254,7 +236,7 @@ void loop()
   /*
     O jogo opera em 4 estados mutuamente exclusivos,
     controlados pelas flags jogoAtivo, menuDificuldadeAtivo,
-    modoLivreAtivo e menuJogoAtivo:
+    modoLivreAtivo e menuJogo:
     
     ESTADO 1 - JOGO ATIVO (jogoAtivo = true):
     - Executa a lógica principal do Genius
@@ -279,7 +261,7 @@ void loop()
     - Menu Principal → Livre: BTN_INICIAR com LIVRE selecionado
     - Dificuldade → Jogo: BTN_INICIAR confirma dificuldade
     - Jogo → Menu Principal: partida encerrada (vitória ou derrota)
-    - Livre → Menu Principal: BTN_MENU pressionado em ouvirLeds()
+    - Livre → Menu Principal: BTN_MENU pressionado em modoLivre()
   */
   if (jogoAtivo) {
     atualizarTela(2);
@@ -291,7 +273,7 @@ void loop()
   } 
   else if (modoLivreAtivo) {
     atualizarTela(3);
-    ouvirLeds();
+    modoLivre();
   } 
   else {
     atualizarTela(0);
@@ -313,7 +295,7 @@ void loop()
   - Se forem iguais: não faz nada, evitando redesenhos desnecessários
   
   Chamada no início de cada iteração do loop(), antes de executar
-  a função do estado ativo (menuJogo, menuDificuldade, ouvirLeds ou jogoGenius)
+  a função do estado ativo (menuJogo, menuDificuldade, modoLivre ou jogoGenius)
 */
 void atualizarTela(uint8_t estadoAtual) {
   if (estadoAtual != estadoAnterior) {
@@ -357,16 +339,16 @@ void  jogoGenius(){
   if(perdeuJogo) return;
 
   // Delay entre rodadas
-  delay(velocidade1);
+  delay(delayEntreRodadas);
 
   /*
     Na rodada 7, aumenta automaticamente a dificuldade reduzindo
     os tempos de espera em 20%, independente do nível inicial selecionado.
   */
   if(rodada == 7){
-    velocidade1 -= (velocidade1 * 20) / 100; // Reduz 20% do valor atual
-    velocidade2 -= (velocidade2 * 20) / 100; // Reduz 20% do valor atual
-    velocidade3 -= (velocidade3 * 20) / 100; // Reduz 20% do valor atual
+    delayEntreRodadas -= (delayEntreRodadas * 20) / 100; // Reduz 20% do valor atual
+    duracaoLedSequencia -= (duracaoLedSequencia * 20) / 100; // Reduz 20% do valor atual
+    intervaloEntreLeds -= (intervaloEntreLeds * 20) / 100; // Reduz 20% do valor atual
   }
 
   // Se o jogador completou todas as 12 rodadas, ele venceu!
@@ -406,14 +388,14 @@ void reproduzirSequencia(){
     PORTD |= (1 << leds[sequencia[i]]); // Liga o Led
     
     // Mantém LED aceso (tempo varia conforme dificuldade)
-    delay(velocidade2);
+    delay(duracaoLedSequencia);
     
     // Para o som e desliga o LED
     noTone(BUZZER);
     PORTD &= ~(1 << leds[sequencia[i]]);  // Desliga o Led
 
     // Intervalo entre LEDs (varia conforme dificuldade)
-    delay(velocidade3);
+    delay(intervaloEntreLeds);
   }
   
 }
@@ -438,13 +420,7 @@ void esperarJogador(){
     // Após o jogador apertar, verifica se acertou
     // Se errou, a função retorna true e o break encerra o loop
     if(verificarJogada(i)) break;
-    
-    // Se acertou, avança para o próximo passo
-    passo ++;
   }
-  
-  // Reseta o contador de passos para a próxima rodada
-  passo = 0;
 }
 
 /*
@@ -462,39 +438,36 @@ void limparJogo(){
     sequencia[i] = 0;
   }
 
-    // Reseta variáveis de controle do jogo
-    rodada = 0;
-    passo = 0;
-    perdeuJogo = false;
+  // Reseta variáveis de controle do jogo
+  rodada = 0;
+  perdeuJogo = false;
 
-    /*
-      Após o jogo terminar (vitória ou derrota), todas as flags de estado
-      são resetadas para retornar ao menu principal:
-      
-      1. jogoAtivo = false         → sai do modo de jogo
-      2. menuDificuldadeAtivo = false → garante que o menu de dificuldade não abra sozinho
-      3. modoLivreAtivo = false          → garante que o modo livre não abra sozinho
-      4. telaAtualizada = false    → força o redesenho do LCD ao entrar no menu principal
-      5. menuJogoAtivo = true      → reativa o menu principal
-      
-      Na próxima iteração do loop(), o else final será executado,
-      chamando menuJogo() e exibindo o menu principal
-    */
-    jogoAtivo = false;
-    menuDificuldadeAtivo = false;
-    modoLivreAtivo = false;
-    telaAtualizada = false;
-    menuJogoAtivo = true;
+  /*
+    Após o jogo terminar (vitória ou derrota), todas as flags de estado
+    são resetadas para retornar ao menu principal:
+    
+    1. jogoAtivo = false         → sai do modo de jogo
+    2. menuDificuldadeAtivo = false → garante que o menu de dificuldade não abra sozinho
+    3. modoLivreAtivo = false          → garante que o modo livre não abra sozinho
+    4. telaAtualizada = false    → força o redesenho do LCD ao entrar no menu principal
+    
+    Na próxima iteração do loop(), o else final será executado,
+    chamando menuJogo() e exibindo o menu principal
+  */
+  jogoAtivo = false;
+  menuDificuldadeAtivo = false;
+  modoLivreAtivo = false;
+  telaAtualizada = false;
 
-    lcd.clear(); // Limpar o LCD
+  lcd.clear(); // Limpar o LCD
 
-    /*
-      Reseta os valores de velocidade (serão sobrescritos por aplicarDificuldade()
-      quando jogador selecionar nova dificuldade)
-    */
-    velocidade1 = 0;
-    velocidade2 = 0;
-    velocidade3 = 0;
+  /*
+    Reseta os valores de velocidade (serão sobrescritos por aplicarDificuldade()
+    quando jogador selecionar nova dificuldade)
+  */
+  delayEntreRodadas = 0;
+  duracaoLedSequencia = 0;
+  intervaloEntreLeds = 0;
 }
 
 /*
@@ -545,7 +518,7 @@ bool jogadaUsuario() {
   - Se errou: exibe mensagem de derrota, toca som de erro, pisca todos os LEDs e marca perdeuJogo
   - Retorna true se errou (para encerrar o loop), false se acertou
 */
-bool verificarJogada(int index) {
+bool verificarJogada(uint8_t index) {
 
   // Compara se o botão pressionado corresponde ao esperado na sequência
   if(sequencia[index] != botaoPressionado){
@@ -594,13 +567,13 @@ void venceuJogo() {
   // Array com as frequências das notas
   int melodia[] = {523, 659, 784, 1047, 784, 1047, 1319, 1047, 784, 659, 523, 392, 523};
 
-  // Array com a duração de cada uma das 7 notas
+  // Array com a duração de cada uma das 13 notas
   int melodiaDuracao[] = {150, 150, 150, 300, 150, 300, 400, 150, 150, 150, 300, 200,500};
 
-  // Array com a pausa de cada uma das 7 notas
+  // Array com a pausa de cada uma das 13 notas
   int melodiaPausa[] = {195, 195, 195, 390, 195, 390, 520, 195, 195, 195, 390, 260, 650};
  
-  // Loop que percorre todas as 7 notas da melodia de vitória
+  // Loop que percorre todas as 13 notas da melodia de vitória
   for(uint8_t i = 0; i < sizeof(melodia)/sizeof(melodia[0]); i++){
 
     // Toca a nota atual com sua duração específica
@@ -673,19 +646,19 @@ void animacaoInicio() {
 void aplicarDificuldade(){
   switch(nivelDificuldade){
     case 0: // Fácil
-      velocidade1 = 1500;
-      velocidade2 = 400;
-      velocidade3 = 250;
+      delayEntreRodadas = 1500;
+      duracaoLedSequencia = 400;
+      intervaloEntreLeds = 250;
       break;
     case 1: // Médio
-      velocidade1 = 1000;
-      velocidade2 = 300;
-      velocidade3 = 200;
+      delayEntreRodadas = 1000;
+      duracaoLedSequencia = 300;
+      intervaloEntreLeds = 200;
       break;
     case 2: // Difícil
-      velocidade1 = 700;
-      velocidade2 = 200;
-      velocidade3 = 150;
+      delayEntreRodadas = 700;
+      duracaoLedSequencia = 200;
+      intervaloEntreLeds = 150;
       break;
   }
 }
@@ -701,7 +674,7 @@ void aplicarDificuldade(){
   
   Transições possíveis:
   - JOGO selecionado → ativa menuDificuldadeAtivo = true → exibe menuDificuldade()
-  - LIVRE selecionado → ativa modoLivreAtivo = true → exibe ouvirLeds()
+  - LIVRE selecionado → ativa modoLivreAtivo = true → exibe modoLivre()
   
   Utiliza variável estática ultimaOpcao para redesenhar o LCD apenas quando
   a seleção muda, evitando flickering desnecessário no display
@@ -738,10 +711,8 @@ void menuJogo() {
 
     if (opcaoMenu == 0) {
       menuDificuldadeAtivo = true;
-      menuJogoAtivo = false;
     } else {
       modoLivreAtivo = true;
-      menuJogoAtivo = false;
     }
   }
 }
@@ -814,7 +785,7 @@ void menuDificuldade(){
         delay(10);
       }
 
-      // Define velocidade1, velocidade2 e velocidade3 baseado em nivelDificuldade
+      // Define delayEntreRodadas, duracaoLedSequencia e intervaloEntreLeds baseado em nivelDificuldade
       aplicarDificuldade();
 
       // Sai do loop while, permitindo que o jogo inicie
@@ -857,11 +828,11 @@ void menuDificuldade(){
   4. Verifica BTN_MENU a cada ciclo — se pressionado, chama limparJogo()
      para resetar os estados e voltar ao menu principal
 */
-void ouvirLeds(){
+void modoLivre(){
 
   // Exibe instruções no LCD apenas na primeira vez que entra no modo
   if(!telaAtualizada){
-    visormodoLivre();
+    visorModoLivre();
     telaAtualizada = true;
   }
 
@@ -941,7 +912,7 @@ void visorDerrota(){
   - Linha 1: instrução para voltar ao menu ("PARA VOLTAR!")
   - Linha 2: instrução do botão a pressionar ("APERTE BTN MENU!")
   
-  Exibida apenas uma vez ao entrar no modo ouvirLeds(),
+  Exibida apenas uma vez ao entrar no modo modoLivre(),
   controlada pela flag telaAtualizada
 */
 void visorModoLivre() {
