@@ -99,6 +99,8 @@ bool SonsLeds = false;
 
 bool telaAtualizada = false;
 
+uint8_t estadoAnterior = 255; // 0: Menu, 1: Dificuldade, 2: Jogo, 3: Sons
+
 // ========== SISTEMA DE DIFICULDADE ==========
 /*
   Sistema de dificuldade dinâmica com 3 níveis:
@@ -215,14 +217,33 @@ void loop()
     - Menu → Jogo: quando BTN_INICIAR é pressionado no menu
     - Jogo → Menu: quando jogo termina (vitória ou derrota)
   */
-  if(jogoAtivo) jogoGenius();
-  else if (menuDificuldadeAtivo) menuDificuldade();
-  else if (SonsLeds) ouvirLeds();
-  else menuJogo();
+  if (jogoAtivo) {
+    atualizarTela(2);
+    jogoGenius();
+  } 
+  else if (menuDificuldadeAtivo) {
+    atualizarTela(1);
+    menuDificuldade();
+  } 
+  else if (SonsLeds) {
+    atualizarTela(3);
+    ouvirLeds();
+  } 
+  else {
+    atualizarTela(0);
+    menuJogo();
+  }
 }
 
 
 // ========== FUNÇÕES DO JOGO ==========
+
+void atualizarTela(uint8_t estadoAtual) {
+  if (estadoAtual != estadoAnterior) {
+    telaAtualizada = false; 
+    estadoAnterior = estadoAtual;
+  }
+}
 
 /*
   Lógica principal do Jogo Genius.
@@ -636,6 +657,12 @@ void menuJogo() {
   - BTN_INICIAR: confirma seleção e inicia o jogo
 */
 void menuDificuldade(){
+
+  if (!telaAtualizada) {
+    lcd.setCursor(0, 0);
+    lcd.print("Dificuldade:");
+    telaAtualizada = true;
+  }
   
   // Array constante com os textos de cada nível de dificuldade
   const char* niveis[3] = {"FACIL", "MEDIO", "DIFICIL"};
