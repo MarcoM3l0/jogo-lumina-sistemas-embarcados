@@ -93,9 +93,10 @@ O circuito foi montado no **Tinkercad**, conforme ilustrado abaixo:
 
 ---
 
-## ✍️ Autor
+## ✍️ Autores
 
 - Marco Melo
+- Diogo Rodrigues
 
 ---
 

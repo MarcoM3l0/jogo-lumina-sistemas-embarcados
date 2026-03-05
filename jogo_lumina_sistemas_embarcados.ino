@@ -2,6 +2,9 @@
   =====================================================
   LUMINA - Jogo de Memória com Luzes e Sons
   Desenvolvido para sistemas embarcados com Arduino
+
+  Autores: José Marco Melo Nascimento
+           Diogo Rodrigues da Silva
   =====================================================
 */
 
@@ -41,7 +44,10 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // ========== ESTRUTURAS DE DADOS ==========
 /*
-  Array que armazena a sequência do jogo (máximo 12 rodadas)
+  Array que armazena a sequência do jogo
+  O tamanho máximo varia conforme o nível selecionado:
+  - Modos FÁCIL, MÉDIO e DIFÍCIL: até 12 rodadas
+  - Modo INSANO: até 50 rodadas (limite do array)
   Cada posição guarda um número de 0 a 3 que representa:
     0 -> LED Vermelho
     1 -> LED Amarelo
@@ -49,7 +55,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
     3 -> LED Verde
   Exemplo: {0, 2, 1, 2, ...} = Vermelho -> Azul -> Amarelo -> Azul -> ...
 */
-uint8_t sequencia[12] = {};
+uint8_t sequencia[50] = {};
 
 // Array com os pinos dos botões na mesma ordem dos LEDs
 // Facilita o acesso aos botões através de índices
@@ -70,9 +76,34 @@ const int tons[4] = {220, 523, 784, 1319};
 /*
   Contador de rodadas:
   - indica quantos passos já foram adicionados à sequência
-  - Quando chega a 12, o jogador venceu o jogo
+  - Quando chega a 12 (nos modos Facil, Medio e Dificil) ou 50 (Modo Insano), 
+    o jogador venceu o jogo
 */
 uint8_t rodada = 0;
+
+/*
+  Define o número de rodadas necessárias para vencer a partida.
+  O valor é atribuído por aplicarDificuldade() conforme o nível:
+  - FÁCIL:   10 rodadas
+  - MÉDIO:   15 rodadas
+  - DIFÍCIL: 20 rodadas
+  - INSANO:  50 rodadas
+
+  Resetado para 0 por limparJogo() ao encerrar a partida
+*/
+uint8_t limiteVitoria = 0;
+
+/*
+  Define em qual rodada as velocidades do jogo são reduzidas em 20%,
+  criando um "salto" de dificuldade personalizado para cada nível:
+  - FÁCIL:   acelera na rodada 5
+  - MÉDIO:   acelera na rodada 7
+  - DIFÍCIL: acelera na rodada 10
+  - INSANO:  não utiliza este mecanismo (velocidade é sorteada a cada rodada)
+
+  Atribuído por aplicarDificuldade() e resetado para 0 por limparJogo()
+*/
+uint8_t pontoDeAceleracao = 0;
 
 // Armazena qual botão foi pressionado pelo jogador
 uint8_t botaoPressionado = 0;
@@ -143,7 +174,7 @@ uint8_t estadoAnterior = 255;
 
 // ========== SISTEMA DE DIFICULDADE ==========
 /*
-  Sistema de dificuldade dinâmica com 3 níveis:
+  Sistema de dificuldade dinâmica com 4 níveis:
   
   Os valores de velocidade são aplicados pela função aplicarDificuldade()
   conforme o nível selecionado pelo jogador:
@@ -162,12 +193,19 @@ uint8_t estadoAnterior = 255;
   - delayEntreRodadas: 700ms (0.7s entre rodadas - pouco tempo para pensar)
   - duracaoLedSequencia: 200ms (LEDs acesos rapidamente - difícil de acompanhar)
   - intervaloEntreLeds: 150ms (pouco intervalo - sequência muito rápida)
+
+  INSANO (nivelDificuldade = 3):
+  - Começa com os valores do FÁCIL, mas a cada rodada um perfil é sorteado
+    aleatoriamente entre Fácil, Médio, Difícil e Insano via aplicarVelocidadeModoInsano()
+  - No perfil Insano puro: delayEntreRodadas 500ms, duracaoLedSequencia 100ms, intervaloEntreLeds 200ms
   
   Quanto menores os valores, mais rápido e difícil fica o jogo
   
-  PROGRESSÃO ADICIONAL:
+  PROGRESSÃO ADICIONAL (modos FÁCIL, MÉDIO e DIFÍCIL):
   Na rodada 7, as velocidades são reduzidas em 20% automaticamente,
-  aumentando ainda mais a dificuldade independente do nível inicial
+  aumentando ainda mais a dificuldade independente do nível inicial.
+  No modo INSANO essa progressão não se aplica — a mudança é feita
+  por aplicarVelocidadeModoInsano() a cada rodada
 */
 int delayEntreRodadas   = 0; // Delay entre rodadas (será definido por aplicarDificuldade())
 int duracaoLedSequencia  = 0; // LED aceso na sequência (será definido por aplicarDificuldade())
@@ -180,7 +218,8 @@ int intervaloEntreLeds = 0; // Intervalo entre LEDs (será definido por aplicarD
   - 0 = FÁCIL (velocidades mais lentas, mais tempo para pensar)
   - 1 = MÉDIO (velocidades padrão, equilíbrio entre desafio e jogabilidade)
   - 2 = DIFÍCIL (velocidades rápidas, requer reflexos aguçados)
-  
+  - 3 = INSANO (velocidade muda aleatoriamente a cada rodada)
+
   O valor é alterado no menu de dificuldade através do botão BTN_MENU
   e aplicado pela função aplicarDificuldade() antes do jogo iniciar
 */
@@ -349,18 +388,46 @@ void jogoLumina(){
   delay(delayEntreRodadas);
 
   /*
-    Na rodada 7, aumenta automaticamente a dificuldade reduzindo
-    os tempos de espera em 20%, independente do nível inicial selecionado.
+    Progressão de dificuldade após cada rodada:
+
+    MODO INSANO (nivelDificuldade == 3):
+    - A cada rodada, sorteia aleatoriamente um dos 4 perfis de velocidade
+      (Fácil, Médio, Difícil ou Insano) via aplicarVelocidadeModoInsano()
+    - Isso torna o ritmo imprevisível, podendo acelerar ou desacelerar
+      a qualquer momento, exigindo adaptação constante do jogador
+
+    DEMAIS MODOS (rodada == pontoDeAceleracao):
+    - Ao atingir o pontoDeAceleracao definido pelo nível selecionado,
+      todas as velocidades são reduzidas em 20%, criando um "salto" de
+      dificuldade personalizado:
+        FÁCIL   → acelera na rodada 5
+        MÉDIO   → acelera na rodada 7
+        DIFÍCIL → acelera na rodada 10
   */
-  if(rodada == 7){
+  if(nivelDificuldade == 3){
+   uint8_t nivelAleatorio = random(4); // Sorteia um perfil de velocidade entre 0 e 3
+   aplicarVelocidadeModoInsano(nivelAleatorio);
+  }
+  else if(rodada == pontoDeAceleracao){
     delayEntreRodadas -= (delayEntreRodadas * 20) / 100; // Reduz 20% do valor atual
     duracaoLedSequencia -= (duracaoLedSequencia * 20) / 100; // Reduz 20% do valor atual
     intervaloEntreLeds -= (intervaloEntreLeds * 20) / 100; // Reduz 20% do valor atual
   }
 
-  // Se o jogador completou todas as 12 rodadas, ele venceu!
-  // Exibe mensagem de vitória e toca melodia especial
-  if(rodada == 12){
+  /* 
+    Verifica se o jogador atingiu o limite de rodadas para vencer.
+    O limiteVitoria varia conforme o nível e é definido por aplicarDificuldade():
+      FÁCIL   → 10 rodadas
+      MÉDIO   → 15 rodadas
+      DIFÍCIL → 20 rodadas
+      INSANO  → 50 rodadas
+    
+    Ao atingir o limite:
+    - Exibe mensagem de vitória no LCD
+    - Reproduz melodia de vitória com show de luzes
+    - Ativa perdeuJogo = true para acionar o reset no próximo ciclo do loop
+  */
+  if(rodada == limiteVitoria){
     visorVitoria();    // Exibe mensagem de vitória no LCD
     venceuJogo();       // Toca melodia de vitória com show de luzes
     perdeuJogo = true;  // Usa a mesma flag de derrota para resetar o jogo
@@ -441,12 +508,14 @@ void esperarJogador(){
 void limparJogo(){
 
   // Limpa toda a sequência armazenada
-  for(uint8_t i = 0; i < 12; i++){
+  for(uint8_t i = 0; i < 50; i++){
     sequencia[i] = 0;
   }
 
   // Reseta variáveis de controle do jogo
   rodada = 0;
+  limiteVitoria = 0;      // Resetado aqui pois seu valor depende do nível selecionado
+  pontoDeAceleracao = 0;  // Idem — será redefinido por aplicarDificuldade() na próxima partida
   perdeuJogo = false;
 
   /*
@@ -646,12 +715,64 @@ void animacaoInicio() {
 }
 
 /*
-  Esta função é chamada quando o jogador confirma a dificuldade no menu
-  através do botão BTN_INICIAR. Ela configura os três parâmetros de velocidade
-  que controlam o ritmo do jogo.
+  Chamada quando o jogador confirma a dificuldade no menu via BTN_INICIAR.
+  Configura todos os parâmetros da partida conforme o nível selecionado:
+  - Velocidades (delayEntreRodadas, duracaoLedSequencia, intervaloEntreLeds)
+  - limiteVitoria: número de rodadas para vencer
+  - pontoDeAceleracao: rodada em que as velocidades são reduzidas em 20%
+
+  O modo INSANO não define pontoDeAceleracao, pois usa lógica própria via 
+  aplicarVelocidadeModoInsano() a cada rodada
 */
 void aplicarDificuldade(){
   switch(nivelDificuldade){
+    case 0: // Fácil
+      delayEntreRodadas = 1500;
+      duracaoLedSequencia = 400;
+      intervaloEntreLeds = 250;
+      limiteVitoria = 10;
+      pontoDeAceleracao = 5;
+      break;
+    case 1: // Médio
+      delayEntreRodadas = 1000;
+      duracaoLedSequencia = 300;
+      intervaloEntreLeds = 200;
+      limiteVitoria = 15;
+      pontoDeAceleracao = 7;
+      break;
+    case 2: // Difícil
+      delayEntreRodadas = 700;
+      duracaoLedSequencia = 200;
+      intervaloEntreLeds = 150;
+      limiteVitoria = 20;
+      pontoDeAceleracao = 10;
+      break;
+    case 3: // INSANO - Começa como o Fácil, mas muda dinamicamente a cada rodada
+      delayEntreRodadas = 1500;
+      duracaoLedSequencia = 400;
+      intervaloEntreLeds = 250;
+      limiteVitoria = 50;
+      pontoDeAceleracao = 255; // Nunca acelera via 'if', pois usa o Caos Aleatório
+      break;
+  }
+}
+
+/*
+  Aplica um perfil de velocidade aleatório no modo INSANO.
+  Chamada a cada rodada com um índice sorteado entre 0 e 3,
+  podendo aplicar qualquer um dos 4 perfis abaixo:
+
+  - case 0 (Fácil):   ritmo lento, fácil de acompanhar
+  - case 1 (Médio):   ritmo moderado
+  - case 2 (Difícil): ritmo rápido
+  - case 3 (Insano):  ritmo extremo — LEDs piscam muito rapidamente
+                      e o intervalo entre eles é mínimo
+
+  A imprevisibilidade entre os perfis é o que define o desafio do modo INSANO,
+  pois o jogador não consegue se adaptar a um ritmo fixo
+*/
+void aplicarVelocidadeModoInsano(uint8_t nivelAleatorio){
+  switch(nivelAleatorio){
     case 0: // Fácil
       delayEntreRodadas = 1500;
       duracaoLedSequencia = 400;
@@ -666,6 +787,11 @@ void aplicarDificuldade(){
       delayEntreRodadas = 700;
       duracaoLedSequencia = 200;
       intervaloEntreLeds = 150;
+      break;
+    case 3: // INSANO 
+      delayEntreRodadas = 500;
+      duracaoLedSequencia = 100;
+      intervaloEntreLeds = 200;
       break;
   }
 }
@@ -730,7 +856,7 @@ void menuJogo() {
   FUNCIONALIDADE:
   - Exibe "Dificuldade:" na linha 1 do LCD
   - Mostra o nível atual com indicador "> " na linha 2
-  - BTN_MENU: navega entre FACIL → MEDIO → DIFICIL → FACIL (cíclico)
+  - BTN_MENU: navega entre FACIL → MEDIO → DIFICIL → INSANO → FACIL (cíclico)
   - BTN_INICIAR: confirma seleção e inicia o jogo
 */
 void menuDificuldade(){
@@ -742,8 +868,8 @@ void menuDificuldade(){
     lcd.print(F("Dificuldade:")); // Exibe título na linha 1
   }
   
-  // Array constante com os textos de cada nível de dificuldade
-  const char* niveis[3] = {"FACIL", "MEDIO", "DIFICIL"};
+  // Array constante com os textos dos 4 níveis de dificuldade disponíveis
+  const char* niveis[4] = {"FACIL", "MEDIO", "DIFICIL", "INSANO"};
   
   /*
     Este loop continua executando enquanto menuDificuldadeAtivo for true
@@ -778,10 +904,10 @@ void menuDificuldade(){
       /*
         Navegação cíclica
 
-        Se passar de 2 (DIFÍCIL), volta para 0 (FÁCIL)
+        Se passar de 3 (INSANO), volta para 0 (FÁCIL)
         Permite navegar infinitamente: FACIL → MEDIO → DIFICIL → FACIL → ...
       */
-      if(nivelDificuldade > 2) nivelDificuldade = 0;
+      if(nivelDificuldade > 3) nivelDificuldade = 0;
     }
 
     // Quando BTN_INICIAR é pressionado, inicia o jogo com a dificuldade selecionada
