@@ -37,17 +37,19 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 // Quando pressionado, ativa o modo de jogo
 #define BTN_INICIAR   PD6 // Pino 6 (bit 6 do PORTD)
 
-// Botão para acessar o menu de dificuldade (Port B)
-// Permite ao jogador escolher entre Fácil, Médio e Difícil
-// A cada pressionamento, cicla entre os 3 níveis de dificuldade
+// Botão de navegação do menu (Port B)
+// Cicla entre as 5 opções disponíveis: LIVRE → FACIL → MEDIO → DIFICIL → INSANO → LIVRE
+// A cada pressionamento, avança para a próxima opção de forma cíclica
 #define BTN_MENU     PB4 // Pino 12 (bit 4 do PORTB)
 
 // ========== ESTRUTURAS DE DADOS ==========
 /*
   Array que armazena a sequência do jogo
   O tamanho máximo varia conforme o nível selecionado:
-  - Modos FÁCIL, MÉDIO e DIFÍCIL: até 12 rodadas
-  - Modo INSANO: até 50 rodadas (limite do array)
+  - FÁCIL:   até 10 rodadas
+  - MÉDIO:   até 15 rodadas
+  - DIFÍCIL: até 20 rodadas
+  - INSANO:  até 50 rodadas (limite do array)
   Cada posição guarda um número de 0 a 3 que representa:
     0 -> LED Vermelho
     1 -> LED Amarelo
@@ -75,9 +77,8 @@ const int tons[4] = {220, 523, 784, 1319};
 // ========== VARIÁVEIS DE CONTROLE DO JOGO ==========
 /*
   Contador de rodadas:
-  - indica quantos passos já foram adicionados à sequência
-  - Quando chega a 12 (nos modos Facil, Medio e Dificil) ou 50 (Modo Insano), 
-    o jogador venceu o jogo
+  - Indica quantos passos já foram adicionados à sequência
+  - O limite para vencer varia por nível (10, 15, 20 ou 50 rodadas)
 */
 uint8_t rodada = 0;
 
@@ -87,7 +88,7 @@ uint8_t rodada = 0;
   - FÁCIL:   10 rodadas
   - MÉDIO:   15 rodadas
   - DIFÍCIL: 20 rodadas
-  - INSANO:  50 rodadas
+  - INSANO:  50 rodadas (teto de segurança do array; o desafio real é sobreviver)
 
   Resetado para 0 por limparJogo() ao encerrar a partida
 */
@@ -107,17 +108,6 @@ uint8_t pontoDeAceleracao = 0;
 
 // Armazena qual botão foi pressionado pelo jogador
 uint8_t botaoPressionado = 0;
-
-/*
-  Armazena a opção selecionada no menu principal
-  
-  Valores possíveis:
-  - 0 = JOGO (inicia o fluxo de seleção de dificuldade e partida)
-  - 1 = LIVRE (entra no modo de exploração de sons e LEDs)
-  
-  Alterado pelo BTN_MENU na função menuJogo()
-*/
-uint8_t opcaoMenu = 0;
 
 // Flag que indica se o jogador errou a sequência
 bool perdeuJogo = false;
@@ -140,7 +130,7 @@ bool jogoAtivo = false;
           ouvir as notas e acender os LEDs correspondentes livremente
   - false: Modo livre inativo
   
-  Ativado no menuJogo() quando jogador seleciona a opção LIVRE
+  Ativado no menuDificuldade() quando jogador seleciona a opção LIVRE
   Desativado por limparJogo() ao pressionar BTN_MENU para voltar ao menu
 */
 bool modoLivreAtivo = false;
@@ -160,13 +150,12 @@ bool telaAtualizada = false;
   Armazena o estado de tela exibido anteriormente
   Usado pela função atualizarTela() para detectar mudanças de estado e
   forçar o redesenho do LCD apenas quando necessário
-  
-  Valores possíveis:
-  - 0: Menu principal
-  - 1: Menu de dificuldade
-  - 2: Jogo em andamento
-  - 3: Modo livre
-  
+
+  Valores possíveis (espelham os argumentos passados em loop()):
+  - 0: Jogo em andamento     → atualizarTela(0) antes de jogoLumina()
+  - 1: Modo livre ativo      → atualizarTela(1) antes de modoLivre()
+  - 2: Menu (seleção de modo)→ atualizarTela(2) antes de menuDificuldade()
+
   Inicializado com 255 (valor inválido) para garantir que o primeiro
   estado seja sempre desenhado ao ligar o sistema
 */
@@ -174,68 +163,63 @@ uint8_t estadoAnterior = 255;
 
 // ========== SISTEMA DE DIFICULDADE ==========
 /*
-  Sistema de dificuldade dinâmica com 4 níveis:
-  
-  Os valores de velocidade são aplicados pela função aplicarDificuldade()
-  conforme o nível selecionado pelo jogador:
-  
-  FÁCIL (nivelDificuldade = 0):
-  - delayEntreRodadas: 1500ms (1.5s entre rodadas - mais tempo para pensar)
-  - duracaoLedSequencia: 400ms (LEDs ficam acesos mais tempo - mais fácil de ver)
-  - intervaloEntreLeds: 250ms (mais intervalo entre LEDs - sequência mais clara)
-  
-  MÉDIO (nivelDificuldade = 1):
-  - delayEntreRodadas: 1000ms (1s entre rodadas - tempo padrão)
-  - duracaoLedSequencia: 300ms (LEDs acesos tempo padrão)
-  - intervaloEntreLeds: 200ms (intervalo padrão entre LEDs)
-  
-  DIFÍCIL (nivelDificuldade = 2):
-  - delayEntreRodadas: 700ms (0.7s entre rodadas - pouco tempo para pensar)
-  - duracaoLedSequencia: 200ms (LEDs acesos rapidamente - difícil de acompanhar)
-  - intervaloEntreLeds: 150ms (pouco intervalo - sequência muito rápida)
+  Sistema com 5 opções de modo, navegadas pelo menu e aplicadas por aplicarDificuldade():
 
-  INSANO (nivelDificuldade = 3):
-  - Começa com os valores do FÁCIL, mas a cada rodada um perfil é sorteado
-    aleatoriamente entre Fácil, Médio, Difícil e Insano via aplicarVelocidadeModoInsano()
-  - No perfil Insano puro: delayEntreRodadas 500ms, duracaoLedSequencia 100ms, intervaloEntreLeds 200ms
-  
-  Quanto menores os valores, mais rápido e difícil fica o jogo
-  
-  PROGRESSÃO ADICIONAL (modos FÁCIL, MÉDIO e DIFÍCIL):
-  Na rodada 7, as velocidades são reduzidas em 20% automaticamente,
-  aumentando ainda mais a dificuldade independente do nível inicial.
-  No modo INSANO essa progressão não se aplica — a mudança é feita
-  por aplicarVelocidadeModoInsano() a cada rodada
+  LIVRE (nivelDificuldade = 0):
+  - Ativa modoLivreAtivo = true; não inicia partida
+
+  FÁCIL (nivelDificuldade = 1):
+  - delayEntreRodadas: 1500ms | duracaoLedSequencia: 400ms | intervaloEntreLeds: 250ms
+  - Vence em 10 rodadas | Acelera 20% na rodada 5
+
+  MÉDIO (nivelDificuldade = 2):
+  - delayEntreRodadas: 1000ms | duracaoLedSequencia: 300ms | intervaloEntreLeds: 200ms
+  - Vence em 15 rodadas | Acelera 20% na rodada 7
+
+  DIFÍCIL (nivelDificuldade = 3):
+  - delayEntreRodadas: 700ms  | duracaoLedSequencia: 200ms | intervaloEntreLeds: 150ms
+  - Vence em 20 rodadas | Acelera 20% na rodada 10
+
+  INSANO (nivelDificuldade = 4):
+  - Começa com os valores do FÁCIL; a cada rodada sorteia aleatoriamente um dos
+    4 perfis (Fácil/Médio/Difícil/Insano) via aplicarVelocidadeModoInsano()
+  - Perfil Insano puro: delayEntreRodadas 500ms, duracaoLedSequencia 100ms, intervaloEntreLeds 200ms
+  - limiteVitoria = 50 (teto de segurança); pontoDeAceleracao = 255 (nunca dispara)
+  - Sem condição de vitória real — o jogador joga até errar
+
+  Quanto menores os valores de velocidade, mais rápido e difícil fica o jogo
 */
 int delayEntreRodadas   = 0; // Delay entre rodadas (será definido por aplicarDificuldade())
 int duracaoLedSequencia  = 0; // LED aceso na sequência (será definido por aplicarDificuldade())
 int intervaloEntreLeds = 0; // Intervalo entre LEDs (será definido por aplicarDificuldade())
 
 /*
-  Armazena o nível de dificuldade selecionado pelo jogador
-  
-  Valores possíveis:
-  - 0 = FÁCIL (velocidades mais lentas, mais tempo para pensar)
-  - 1 = MÉDIO (velocidades padrão, equilíbrio entre desafio e jogabilidade)
-  - 2 = DIFÍCIL (velocidades rápidas, requer reflexos aguçados)
-  - 3 = INSANO (velocidade muda aleatoriamente a cada rodada)
+  Armazena a opção selecionada no menu, usada por aplicarDificuldade()
+  para configurar o modo de jogo ou ativar o modo livre
 
-  O valor é alterado no menu de dificuldade através do botão BTN_MENU
-  e aplicado pela função aplicarDificuldade() antes do jogo iniciar
+  Valores possíveis:
+  - 0 = LIVRE   (ativa modoLivreAtivo — sem partida, exploração livre de sons e LEDs)
+  - 1 = FÁCIL   (velocidades lentas,  acelera na rodada 5,  vence em 10 rodadas)
+  - 2 = MÉDIO   (velocidades padrão,  acelera na rodada 7,  vence em 15 rodadas)
+  - 3 = DIFÍCIL (velocidades rápidas, acelera na rodada 10, vence em 20 rodadas)
+  - 4 = INSANO  (velocidade aleatória a cada rodada, sem condição de vitória real)
+
+  Alterado pelo BTN_MENU em menuDificuldade() e aplicado ao pressionar BTN_INICIAR
 */
 uint8_t nivelDificuldade = 0; 
 
 
 /*
-  Flag que controla se o menu de dificuldade está ativo
-  
+  Flag que controla se o menu principal está ativo
+
   Estados:
-  - true: Menu de dificuldade visível no LCD
-           Jogador pode navegar com BTN_MENU e confirmar com BTN_INICIAR
-           Função menuDificuldade() está em execução
-  - false: Menu fechado, jogo em andamento
+  - true:  Menu visível no LCD — jogador navega com BTN_MENU e confirma com BTN_INICIAR
+           Inicializado como true pois menuDificuldade() é agora o ponto de entrada
+           do sistema, exibido ao ligar e após encerrar qualquer partida ou modo livre
+  - false: Menu fechado — jogo em andamento (jogoAtivo = true)
+           Resetado de volta para true por limparJogo() ao encerrar a partida
 */
-bool menuDificuldadeAtivo = false;
+bool menuDificuldadeAtivo = true;
 
 // Máscara global dos leds para facilitar ligar/desligar todos os LEDs ao mesmo tempo
 const uint8_t ledsMascara = (1 << LED_VERMELHO) | (1 << LED_AMARELO) | (1 << LED_AZUL) | (1 << LED_VERDE);
@@ -280,50 +264,41 @@ void setup()
 void loop()
 {
   /*
-    O jogo opera em 4 estados mutuamente exclusivos,
-    controlados pelas flags jogoAtivo, menuDificuldadeAtivo,
-    modoLivreAtivo e menuJogo:
-    
+    O jogo opera em 3 estados mutuamente exclusivos,
+    controlados pelas flags jogoAtivo e modoLivreAtivo
+    (menuDificuldade() é executado no else, quando ambas são false):
+
     ESTADO 1 - JOGO ATIVO (jogoAtivo = true):
     - Executa a lógica principal do Lumina
     - Gerencia rodadas, sequências e validações
     - Detecta vitória ou derrota
-    
-    ESTADO 2 - MENU DE DIFICULDADE (menuDificuldadeAtivo = true):
-    - Exibe opções de dificuldade no LCD
-    - Aguarda navegação via BTN_MENU
-    - Aguarda confirmação via BTN_INICIAR
-    
-    ESTADO 3 - MODO LIVRE (modoLivreAtivo = true):
+
+    ESTADO 2 - MODO LIVRE (modoLivreAtivo = true):
     - Permite explorar sons e LEDs livremente
-    - BTN_MENU retorna ao menu principal
-    
-    ESTADO 4 - MENU PRINCIPAL (todos os outros false):
-    - Exibe opções JOGO e LIVRE no LCD
-    - Ponto de entrada após ligar o sistema ou encerrar partida
-    
+    - BTN_MENU retorna ao menu via limparJogo()
+
+    ESTADO 3 - MENU (else — menuDificuldadeAtivo = true):
+    - Ponto de entrada ao ligar e após encerrar qualquer partida ou modo livre
+    - Exibe as 5 opções: LIVRE, FACIL, MEDIO, DIFICIL, INSANO
+    - BTN_MENU navega entre as opções; BTN_INICIAR confirma
+
     Transições:
-    - Menu Principal → Dificuldade: BTN_INICIAR com JOGO selecionado
-    - Menu Principal → Livre: BTN_INICIAR com LIVRE selecionado
-    - Dificuldade → Jogo: BTN_INICIAR confirma dificuldade
-    - Jogo → Menu Principal: partida encerrada (vitória ou derrota)
-    - Livre → Menu Principal: BTN_MENU pressionado em modoLivre()
+    - Menu → Modo Livre:  BTN_INICIAR com LIVRE selecionado (nivelDificuldade == 0)
+    - Menu → Jogo:        BTN_INICIAR com qualquer nível 1–4 selecionado
+    - Jogo → Menu:        partida encerrada (vitória ou derrota) via limparJogo()
+    - Modo Livre → Menu:  BTN_MENU pressionado em modoLivre() via limparJogo()
   */
   if (jogoAtivo) {
-    atualizarTela(2);
-    jogoLumina();
-  } 
-  else if (menuDificuldadeAtivo) {
-    atualizarTela(1);
-    menuDificuldade();
-  } 
-  else if (modoLivreAtivo) {
-    atualizarTela(3);
-    modoLivre();
-  } 
-  else {
     atualizarTela(0);
-    menuJogo();
+    jogoLumina();
+  }  
+  else if (modoLivreAtivo) {
+    atualizarTela(1);
+    modoLivre();
+  }
+  else{
+    atualizarTela(2);
+    menuDificuldade();
   }
 }
 
@@ -341,7 +316,7 @@ void loop()
   - Se forem iguais: não faz nada, evitando redesenhos desnecessários
   
   Chamada no início de cada iteração do loop(), antes de executar
-  a função do estado ativo (menuJogo, menuDificuldade, modoLivre ou jogoLumina)
+  a função do estado ativo (menuDificuldade, modoLivre ou jogoLumina)
 */
 void atualizarTela(uint8_t estadoAtual) {
   if (estadoAtual != estadoAnterior) {
@@ -390,7 +365,7 @@ void jogoLumina(){
   /*
     Progressão de dificuldade após cada rodada:
 
-    MODO INSANO (nivelDificuldade == 3):
+    MODO INSANO (nivelDificuldade == 4):
     - A cada rodada, sorteia aleatoriamente um dos 4 perfis de velocidade
       (Fácil, Médio, Difícil ou Insano) via aplicarVelocidadeModoInsano()
     - Isso torna o ritmo imprevisível, podendo acelerar ou desacelerar
@@ -404,7 +379,7 @@ void jogoLumina(){
         MÉDIO   → acelera na rodada 7
         DIFÍCIL → acelera na rodada 10
   */
-  if(nivelDificuldade == 3){
+  if(nivelDificuldade == 4){
    uint8_t nivelAleatorio = random(4); // Sorteia um perfil de velocidade entre 0 e 3
    aplicarVelocidadeModoInsano(nivelAleatorio);
   }
@@ -420,8 +395,9 @@ void jogoLumina(){
       FÁCIL   → 10 rodadas
       MÉDIO   → 15 rodadas
       DIFÍCIL → 20 rodadas
-      INSANO  → 50 rodadas
-    
+      INSANO  → 50 rodadas (teto de segurança do array; na prática o jogador
+                            dificilmente chega lá — o desafio é sobreviver)
+
     Ao atingir o limite:
     - Exibe mensagem de vitória no LCD
     - Reproduz melodia de vitória com show de luzes
@@ -520,18 +496,18 @@ void limparJogo(){
 
   /*
     Após o jogo terminar (vitória ou derrota), todas as flags de estado
-    são resetadas para retornar ao menu principal:
-    
-    1. jogoAtivo = false         → sai do modo de jogo
-    2. menuDificuldadeAtivo = false → garante que o menu de dificuldade não abra sozinho
-    3. modoLivreAtivo = false          → garante que o modo livre não abra sozinho
-    4. telaAtualizada = false    → força o redesenho do LCD ao entrar no menu principal
-    
-    Na próxima iteração do loop(), o else final será executado,
-    chamando menuJogo() e exibindo o menu principal
+    são resetadas para retornar ao menu:
+
+    1. jogoAtivo = false           → sai do modo de jogo
+    2. menuDificuldadeAtivo = true → reativa o menu como ponto de entrada
+    3. modoLivreAtivo = false      → garante que o modo livre não abra sozinho
+    4. telaAtualizada = false      → força o redesenho do LCD ao entrar no menu
+
+    Na próxima iteração do loop(), o else será executado,
+    chamando menuDificuldade() e exibindo o menu novamente
   */
   jogoAtivo = false;
-  menuDificuldadeAtivo = false;
+  menuDificuldadeAtivo = true;
   modoLivreAtivo = false;
   telaAtualizada = false;
 
@@ -628,13 +604,13 @@ bool verificarJogada(uint8_t index) {
 }
 
 /*
-  Função chamada quando o jogador completa todas as 12 rodadas
-  
+  Chamada quando o jogador atinge o limiteVitoria do nível selecionado
+
   Reproduz um tema de vitória com show de luzes:
   - melodia[]: frequências das 13 notas
   - melodiaDuracao[]: duração de cada nota
   - melodiaPausa[]: pausa após cada nota
-  
+
   Durante a melodia, todos os LEDs piscam rapidamente criando efeito estroboscópico
 */
 void venceuJogo() {
@@ -715,39 +691,44 @@ void animacaoInicio() {
 }
 
 /*
-  Chamada quando o jogador confirma a dificuldade no menu via BTN_INICIAR.
-  Configura todos os parâmetros da partida conforme o nível selecionado:
-  - Velocidades (delayEntreRodadas, duracaoLedSequencia, intervaloEntreLeds)
-  - limiteVitoria: número de rodadas para vencer
-  - pontoDeAceleracao: rodada em que as velocidades são reduzidas em 20%
+  Chamada quando o jogador confirma a seleção no menu via BTN_INICIAR.
+  Configura os parâmetros da partida conforme a opção escolhida:
 
-  O modo INSANO não define pontoDeAceleracao, pois usa lógica própria via 
-  aplicarVelocidadeModoInsano() a cada rodada
+  case 0 (LIVRE):   ativa modoLivreAtivo = true — não configura velocidades nem inicia jogo
+  case 1 (FÁCIL):   velocidades lentas,  limiteVitoria = 10, pontoDeAceleracao = 5
+  case 2 (MÉDIO):   velocidades padrão,  limiteVitoria = 15, pontoDeAceleracao = 7
+  case 3 (DIFÍCIL): velocidades rápidas, limiteVitoria = 20, pontoDeAceleracao = 10
+  case 4 (INSANO):  velocidades iniciais do FÁCIL, limiteVitoria = 50,
+                    pontoDeAceleracao = 255 (valor sentinela — nunca dispara o if de aceleração,
+                    pois a velocidade é gerenciada rodada a rodada por aplicarVelocidadeModoInsano())
 */
 void aplicarDificuldade(){
   switch(nivelDificuldade){
-    case 0: // Fácil
+    case 0: // Livre
+      modoLivreAtivo = true;
+      break;
+    case 1: // Fácil
       delayEntreRodadas = 1500;
       duracaoLedSequencia = 400;
       intervaloEntreLeds = 250;
       limiteVitoria = 10;
       pontoDeAceleracao = 5;
       break;
-    case 1: // Médio
+    case 2: // Médio
       delayEntreRodadas = 1000;
       duracaoLedSequencia = 300;
       intervaloEntreLeds = 200;
       limiteVitoria = 15;
       pontoDeAceleracao = 7;
       break;
-    case 2: // Difícil
+    case 3: // Difícil
       delayEntreRodadas = 700;
       duracaoLedSequencia = 200;
       intervaloEntreLeds = 150;
       limiteVitoria = 20;
       pontoDeAceleracao = 10;
       break;
-    case 3: // INSANO - Começa como o Fácil, mas muda dinamicamente a cada rodada
+    case 4: // INSANO - Começa como o Fácil, mas muda dinamicamente a cada rodada
       delayEntreRodadas = 1500;
       duracaoLedSequencia = 400;
       intervaloEntreLeds = 250;
@@ -796,68 +777,19 @@ void aplicarVelocidadeModoInsano(uint8_t nivelAleatorio){
   }
 }
 
-/*
-  Menu principal do sistema, exibido ao ligar o Arduino ou após encerrar uma partida
-  
-  FUNCIONALIDADE:
-  - Exibe duas opções navegáveis no LCD: JOGO e LIVRE
-  - O indicador "> " aponta para a opção selecionada no momento
-  - BTN_MENU: alterna a seleção entre JOGO e LIVRE (comportamento toggle)
-  - BTN_INICIAR: confirma a opção selecionada e redireciona para o modo correspondente
-  
-  Transições possíveis:
-  - JOGO selecionado → ativa menuDificuldadeAtivo = true → exibe menuDificuldade()
-  - LIVRE selecionado → ativa modoLivreAtivo = true → exibe modoLivre()
-  
-  Utiliza variável estática ultimaOpcao para redesenhar o LCD apenas quando
-  a seleção muda, evitando flickering desnecessário no display
-*/
-void menuJogo() {
-  
-  static uint8_t ultimaOpcao = 255; 
-
-  if (opcaoMenu != ultimaOpcao) {
-    if (opcaoMenu == 0) {
-      lcd.setCursor(0, 0); lcd.print("> JOGO");
-      lcd.setCursor(0, 1); lcd.print("  LIVRE");
-    } else {
-      lcd.setCursor(0, 0); lcd.print("  JOGO");
-      lcd.setCursor(0, 1); lcd.print("> LIVRE");
-    }
-    ultimaOpcao = opcaoMenu;
-  }
-
-  // Navegação no Menu
-  if (!(PINB & (1 << BTN_MENU))) {
-    while (!(PINB & (1 << BTN_MENU))) { delay(10); }
-    opcaoMenu = !opcaoMenu;
-  }
-
-  // Confirmação
-  if (!(PIND & (1 << BTN_INICIAR))) {
-    while (!(PIND & (1 << BTN_INICIAR))) { delay(10); }
-    
-    // Antes de mudar de estado, resetamos a sinalização
-    ultimaOpcao = 255; 
-    telaAtualizada = false;
-    lcd.clear(); // Limpa o menu para entrar no próximo modo
-
-    if (opcaoMenu == 0) {
-      menuDificuldadeAtivo = true;
-    } else {
-      modoLivreAtivo = true;
-    }
-  }
-}
-
 /* 
-  Interface interativa no LCD que permite ao jogador escolher o nível de dificuldade
+  Menu principal do sistema — centralizando a navegação 
+  de modo e dificuldade em uma única função.
 
   FUNCIONALIDADE:
   - Exibe "Dificuldade:" na linha 1 do LCD
-  - Mostra o nível atual com indicador "> " na linha 2
-  - BTN_MENU: navega entre FACIL → MEDIO → DIFICIL → INSANO → FACIL (cíclico)
-  - BTN_INICIAR: confirma seleção e inicia o jogo
+  - Mostra a opção atual com indicador "> " na linha 2
+  - BTN_MENU: avança ciclicamente entre as 5 opções (índices 0 a 4):
+              LIVRE → FACIL → MEDIO → DIFICIL → INSANO → LIVRE → ...
+  - BTN_INICIAR: confirma a seleção e redireciona conforme o índice:
+      0 (LIVRE)  → chama aplicarDificuldade() que ativa modoLivreAtivo = true,
+                   depois retorna (return) sem fechar menuDificuldadeAtivo nem iniciar jogo
+      1–4        → chama aplicarDificuldade(), fecha o menu, exibe animação e inicia jogo
 */
 void menuDificuldade(){
 
@@ -868,8 +800,8 @@ void menuDificuldade(){
     lcd.print(F("Dificuldade:")); // Exibe título na linha 1
   }
   
-  // Array constante com os textos dos 4 níveis de dificuldade disponíveis
-  const char* niveis[4] = {"FACIL", "MEDIO", "DIFICIL", "INSANO"};
+  // Array com as 5 opções do menu, indexadas por nivelDificuldade
+  const char* niveis[5] = {"LIVRE", "FACIL", "MEDIO", "DIFICIL", "INSANO"};
   
   /*
     Este loop continua executando enquanto menuDificuldadeAtivo for true
@@ -902,12 +834,11 @@ void menuDificuldade(){
       nivelDificuldade++;
 
       /*
-        Navegação cíclica
-
-        Se passar de 3 (INSANO), volta para 0 (FÁCIL)
-        Permite navegar infinitamente: FACIL → MEDIO → DIFICIL → FACIL → ...
+        Navegação cíclica entre as 5 opções (índices 0 a 4)
+        Se passar de 4 (INSANO), volta para 0 (LIVRE)
+        Permite navegar infinitamente: LIVRE → FACIL → MEDIO → DIFICIL → INSANO → LIVRE → ...
       */
-      if(nivelDificuldade > 3) nivelDificuldade = 0;
+      if(nivelDificuldade > 4) nivelDificuldade = 0;
     }
 
     // Quando BTN_INICIAR é pressionado, inicia o jogo com a dificuldade selecionada
@@ -918,25 +849,38 @@ void menuDificuldade(){
         delay(10);
       }
 
-      // Define delayEntreRodadas, duracaoLedSequencia e intervaloEntreLeds baseado em nivelDificuldade
+      // Configura o modo selecionado: velocidades, limiteVitoria e pontoDeAceleracao
+      // Para LIVRE (índice 0): apenas ativa modoLivreAtivo = true
       aplicarDificuldade();
 
-      // Sai do loop while, permitindo que o jogo inicie
-      menuDificuldadeAtivo = false;
+      if(nivelDificuldade != 0){
+        // Fecha o menu e inicia a partida
+        menuDificuldadeAtivo = false;
 
-      //Feedback visual no LCD indicando o nível selecionado
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Nivel: ");
-      lcd.print(niveis[nivelDificuldade]);
+        //Feedback visual no LCD indicando o nível selecionado
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Nivel: ");
+        lcd.print(niveis[nivelDificuldade]);
 
-      // Reproduz animação visual e sonora indicando início do jogo
-      // Sequência de 5 notas ascendentes (300-700 Hz) com LEDs piscando
-      animacaoInicio();
+        // Reproduz animação visual e sonora indicando início do jogo
+        // Sequência de 5 notas ascendentes (300-700 Hz) com LEDs piscando
+        animacaoInicio();
 
-      // Muda o estado para jogoAtivo = true
-      // Na próxima iteração do loop(), jogoLumina() será executado
-      jogoAtivo = true;
+        // Muda o estado para jogoAtivo = true
+        // Na próxima iteração do loop(), jogoLumina() será executado
+        jogoAtivo = true;
+      } 
+      // LIVRE selecionado: modoLivreAtivo já foi ativado em aplicarDificuldade(),
+      // retorna sem iniciar jogo
+      else {
+
+        animacaoInicio();
+
+        // Fecha o menu e inicia o modo Livre
+        menuDificuldadeAtivo = false;
+        return;
+      }
     }
 
     // Pequeno delay para evitar leituras muito rápidas do botão
@@ -1007,7 +951,7 @@ void modoLivre(){
 /*
   Interface no LCD que exibe a rodada atual do jogo
   - Atualiza a linha 2 do LCD com o texto "Rodada: X"
-  - Onde X é o número da rodada atual (1 a 12)
+  - Onde X é o número da rodada atual (varia conforme o limiteVitoria do nível)
 */
 void visorRodadas(){
   lcd.setCursor(0, 1);     // Linha 2
